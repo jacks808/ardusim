@@ -200,7 +200,6 @@
 		private var medium_loopCounter		:int = 0;
 		private var slow_loopCounter		:int = 0;
 		private var superslow_loopCounter	:int = 0;
-		private var takeoff_timer			:int = 0;
 
 
 		// --------------------------------------
@@ -965,26 +964,13 @@
 						}
 
 						if (takeoff_complete == false && motors.armed()){
-							if ((g.rc_3.control_in > g.throttle_cruise) /*&& ((millis() - takeoff_timer) > 5000)*/){
+							if (g.rc_3.control_in > g.throttle_cruise){
 								// we must be in the air by now
 								takeoff_complete = true;
 							}
 						}
 
 					}else{
-						// we are on the ground
-						//takeoff_complete = false;
-
-						// reset baro data if we are near home
-						if(home_distance < 400  || GPS_enabled == false){ // 4m from home
-							// causes Baro to do a quick recalibration
-							// XXX commented until further testing
-							// reset_baro();
-						}
-
-						// remember our time since takeoff
-						// -------------------------------
-						takeoff_timer = millis();
 
 						// make sure we also request 0 throttle out
 						// so the props stop ... properly
