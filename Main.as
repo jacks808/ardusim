@@ -857,7 +857,6 @@
 		{
 			// this function disarms the copter if it has been sitting on the ground for any moment of time greater than 25 seconds
 			// but only of the control mode is manual
-			trace("auto_disarming_counter", auto_disarming_counter)
 			if((control_mode <= ACRO) && (g.rc_3.control_in == 0)){
 				auto_disarming_counter++;
 
@@ -1536,7 +1535,6 @@
 			// ---------------------
 			next_WP = wp.clone();
 
-			trace("set_next_WPlng "+next_WP.lng);
 			// used to control and limit the rate of climb
 			// -------------------------------------------
 			// We don't set next WP below 1m
@@ -2053,7 +2051,7 @@
 					if(ground_detector++ >= 30) {
 						land_complete = true;
 						ground_detector = 30;
-						trace("landed", g.rc_3.control_in);
+						trace("landed");
 						if(g.rc_3.control_in == 0){
 							init_disarm_motors();
 						}
@@ -2695,7 +2693,6 @@
 				// wrap
 				if (circle_angle > 6.28318531)
 					circle_angle -= 6.28318531;
-				trace("circle"+ next_WP.lng);
 				next_WP.lng = circle_WP.lng + (g.loiter_radius * 100 * Math.cos(1.57 - circle_angle) * scaleLongUp);
 				//circle_WP.lat = next_WP.lat + (g.loiter_radius * 100 * Math.sin(1.57 - circle_angle));
 
@@ -2773,6 +2770,7 @@
 			// Next_WP alt is our target alt
 			// It changes based on climb rate
 			// until it reaches the target_altitude
+			trace(next_WP.alt, current_loc.alt);
 			return next_WP.alt - current_loc.alt;
 		}
 
@@ -2790,11 +2788,6 @@
 
 		public function set_new_altitude(_new_alt:Number):void
 		{
-			trace("set next altitude: "+_new_alt);
-			if(_new_alt == -1000){
-				trace("jason")
-			}
-
 			if(_new_alt == current_loc.alt){
 				force_new_altitude(_new_alt);
 				return;
@@ -3120,7 +3113,6 @@
 					if (AAP_timer < 95){ 	// .5 seconds
 						g.rc_1.servo_out = get_stabilize_roll(0);
 						g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC;
-						trace("g.rc_3.servo_out", g.rc_3.servo_out)
 						AAP_timer++;
 					}else{
 						AAP_state++;
@@ -3407,6 +3399,9 @@
 
 			// update pulldown in GUI
 			modeMenu.setSelectedIndex(mode);
+
+			// used to stop fly_aways
+			motors.auto_armed = (g.rc_3.control_in > 0);
 
 			// clearing value used in interactive alt hold
 			manual_boost = 0;
