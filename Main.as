@@ -158,6 +158,11 @@
 		public const CMD_BLANK						:int = 0;
 		public const NO_COMMAND						:int = 0;
 
+		// disarm the copter after no throttle
+		public const AUTO_DISARMING_DELAY			:int = 20;
+
+
+
 		// nav byte mask
 		// -------------
 		public const NAV_LOCATION					:int = 1;
@@ -200,6 +205,8 @@
 		private var medium_loopCounter		:int = 0;
 		private var slow_loopCounter		:int = 0;
 		private var superslow_loopCounter	:int = 0;
+		private var auto_disarming_counter	:int = 0;
+		private var counter_one_herz		:int = 0;
 
 
 		// --------------------------------------
@@ -550,6 +557,10 @@
 			graph_button.setEventName("CLEAR_GRAPH");
 			stage.addEventListener("CLEAR_GRAPH",graphHandler);
 
+			arm_button.setLabel("ARM");
+			arm_button.setEventName("ARM");
+			stage.addEventListener("ARM",armHandler);
+
 			plotMenu.setEventName("PLOT_MENU");
 			plotMenu2.setEventName("PLOT_MENU");
 			stage.addEventListener("PLOT_MENU",plotMenuHandler);
@@ -636,6 +647,15 @@
 				// perform 10hz tasks
 				// ------------------
 				medium_loop();
+
+				counter_one_herz++;
+
+				// trgger our 1 hz loop
+				if(counter_one_herz >= 50){
+					super_slow_loop();
+					counter_one_herz = 0;
+				}
+
 				// Stuff to run at full 50hz, but after the med loops
 				// --------------------------------------------------
 				fifty_hz_loop();
@@ -736,7 +756,7 @@
 						}
 					}
 
-					if(motors.armed()){
+					if(motors.armed){
 						//if (g.log_bitmask & MASK_LOG_ATTITUDE_MED)
 						//	Log_Write_Attitude();
 
@@ -798,7 +818,7 @@
 					//}
 
 					// check the user hasn't updated the frame orientation
-					//if( !motors.armed() ) {
+					//if( !motors.armed ) {
 						//motors.set_frame_orientation(g.frame_orientation);
 					//}
 
@@ -830,6 +850,24 @@
 				default:
 					slow_loopCounter = 0;
 					break;
+			}
+		}
+
+		public function super_slow_loop():void
+		{
+			// this function disarms the copter if it has been sitting on the ground for any moment of time greater than 25 seconds
+			// but only of the control mode is manual
+			trace("auto_disarming_counter", auto_disarming_counter)
+			if((control_mode <= ACRO) && (g.rc_3.control_in == 0)){
+				auto_disarming_counter++;
+
+				if(auto_disarming_counter == AUTO_DISARMING_DELAY){
+					init_disarm_motors();
+				}else if (auto_disarming_counter > AUTO_DISARMING_DELAY){
+					auto_disarming_counter = AUTO_DISARMING_DELAY + 1;
+				}
+			}else{
+				auto_disarming_counter = 0;
 			}
 		}
 
@@ -963,7 +1001,7 @@
 							g.throttle_cruise = throttle_avg;
 						}
 
-						if (takeoff_complete == false && motors.armed()){
+						if (takeoff_complete == false && motors.armed){
 							if (g.rc_3.control_in > g.throttle_cruise){
 								// we must be in the air by now
 								takeoff_complete = true;
@@ -1296,11 +1334,28 @@
 			return output + i_hold_rate;
 		}
 
+		public function init_arm_motors():void
+		{
+			motors.armed = true;
+
+			// Reset home position
+			// -------------------
+			if(home_is_set)
+				init_home();
+
+			// all I terms are invalid
+			// -----------------------
+			reset_I_all();
+			update_arm_label();
+		}
+
 		public function init_disarm_motors():void
 		{
 			trace("Disarm Motors");
 			takeoff_complete = false;
-			stopSIM();
+			//stopSIM();
+			motors.armed = false;
+			update_arm_label();
 			//g.throttle_cruise.save();
 		}
 
@@ -1966,7 +2021,6 @@
 						ground_detector = 30;
 						//icount = 1;
 						if(g.rc_3.control_in == 0){
-							//init_disarm_motors
 							init_disarm_motors();
 						}
 						return true;
@@ -2553,25 +2607,29 @@
 
 		public function set_servos()
 		{
-			copter.throttle = g.rc_3.servo_out;
-			//copter.throttle = nav_thrust_z; // g.rc_3.servo_out;
+			if(motors.armed){
+				copter.throttle = g.rc_3.servo_out;
+				//copter.throttle = nav_thrust_z; // g.rc_3.servo_out;
 
-			var target_rpm:Number;
+				var target_rpm:Number;
 
-			motor_pwm			= g.rc_1.servo_out *.1;	// motor_pwm = 0 - 1000;
-			target_rpm			=  motor_pwm / 1000 * g.motor_kv; // 11.1 * 1000 * .8 = 8880;
-			//motor_rpm			+= constrain((target_rpm - motor_rpm), -400, 400);
+				motor_pwm			= g.rc_1.servo_out *.1;	// motor_pwm = 0 - 1000;
+				target_rpm			=  motor_pwm / 1000 * g.motor_kv; // 11.1 * 1000 * .8 = 8880;
+				//motor_rpm			+= constrain((target_rpm - motor_rpm), -400, 400);
 
-			//trace(motor_pwm, target_rpm);
+				//trace(motor_pwm, target_rpm);
 
-			//motor_rpm			+= (target_rpm - motor_rpm);
-			motor_rpm			= target_rpm;
+				//motor_rpm			+= (target_rpm - motor_rpm);
+				motor_rpm			= target_rpm;
 
-			ahrs.omega.x 		+= motor_rpm * 1.4; 			//rpm_to_thrust; // tune for real life
-			//trace("ahrs.omega.x")
-			ahrs.addToRoll(ahrs.omega.x * G_Dt);
-			//ahrs.roll_sensor 	+= ahrs.omega.x * G_Dt;
-			//ahrs.roll_sensor		= wrap_180(ahrs.roll_sensor);
+				ahrs.omega.x 		+= motor_rpm * 1.4; 			//rpm_to_thrust; // tune for real life
+				//trace("ahrs.omega.x")
+				ahrs.addToRoll(ahrs.omega.x * G_Dt);
+				//ahrs.roll_sensor 	+= ahrs.omega.x * G_Dt;
+				//ahrs.roll_sensor		= wrap_180(ahrs.roll_sensor);
+			}else{
+				copter.throttle = 0;
+			}
 		}
 
 		/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
@@ -3199,7 +3257,7 @@
 					// Don't enter Failsafe if we are not armed
 					// home distance is in meters
 					// This is to prevent accidental RTL
-					if(motors.armed() && takeoff_complete){
+					if(motors.armed && takeoff_complete){
 						trace("MSG FS ON ",pwm);
 						set_failsafe(true);
 					}
@@ -3536,6 +3594,8 @@
 			this.removeEventListener(Event.ENTER_FRAME, runSim);
 			this.addEventListener(Event.ENTER_FRAME, idle);
 			sim_controller.setLabel("Start Sim");
+			update_arm_label();
+			init_disarm_motors();
 		}
 
 		private function startSIM():void
@@ -3556,6 +3616,10 @@
 			g.visible = false;
 			gains_button.setLabel("Show Gains");
 			sky.draw();
+			//motors.armed = true;
+			init_arm_motors();
+			update_arm_label();
+
 		}
 
 		private function init_sim():void
@@ -3725,6 +3789,21 @@
 			set_mode(modeMenu.getSelectedIndex());
 		}
 
+		private function armHandler(e:Event):void
+		{
+			motors.armed = !motors.armed;
+			update_arm_label();
+		}
+
+		private function update_arm_label():void
+		{
+			trace("motors.armed", motors.armed);
+
+			if(motors.armed)
+				arm_button.setLabel("Motors Armed");
+			else
+				arm_button.setLabel("Motors Disarmed");
+		}
 		// -----------------------------------------------------------------------------------
 		// Plotting
 		//------------------------------------------------------------------------------------
