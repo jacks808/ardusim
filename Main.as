@@ -46,82 +46,82 @@
 		// --------------------------------------
 		// SIM and Data
 		// --------------------------------------
-		public var g						:Parameters;
-		public var simIsRunnning			:Boolean = false;
-		public var iteration				:int = 0;
-		public var copter					:Copter;
-		public var ghost					:MovieClip;
-		public var copter_lag				:MovieClip;
-		public var ahrs						:AHRS;
-		public var relay					:Relay;
-		public var motor_rpm				:Number = 0;
-		public var motor_pwm				:Number = 0;
-		public var failsafe					:Boolean = false;
+		public var g								:Parameters;
+		public var simIsRunnning					:Boolean = false;
+		public var iteration						:int = 0;
+		public var copter							:Copter;
+		public var ghost							:MovieClip;
+		public var copter_lag						:MovieClip;
+		public var ahrs								:AHRS;
+		public var relay							:Relay;
+		public var motor_rpm						:Number = 0;
+		public var motor_pwm						:Number = 0;
+		public var failsafe							:Boolean = false;
 
-		public var control_mode				:int = 2;
-		public var new_radio_frame			:Boolean = false;
-		public var colors					:Array;
-		public var colorIndex				:int = -1;
-		public var motors					:Motors;
-		public var waypoints				:Array;
+		public var control_mode						:int = 2;
+		public var new_radio_frame					:Boolean = false;
+		public var colors							:Array;
+		public var colorIndex						:int = -1;
+		public var motors							:Motors;
+		public var waypoints						:Array;
 
 		// --------------------------------------
 		// Defines
 		// --------------------------------------
-		public const STABILIZE				:int = 0;
-		public const ACRO					:int = 1;
-		public const ALT_HOLD				:int = 2;
-		public const AUTO					:int = 3;
-		public const GUIDED					:int = 4;
-		public const LOITER					:int = 5;
-		public const RTL					:int = 6;
-		public const CIRCLE					:int = 7;
-		public const POSITION				:int = 8;
-		public const LAND					:int = 9;
-		public const OF_LOITER				:int = 10;
-		public const APPROACH				:int = 11;
+		public const STABILIZE						:int = 0;
+		public const ACRO							:int = 1;
+		public const ALT_HOLD						:int = 2;
+		public const AUTO							:int = 3;
+		public const GUIDED							:int = 4;
+		public const LOITER							:int = 5;
+		public const RTL							:int = 6;
+		public const CIRCLE							:int = 7;
+		public const POSITION						:int = 8;
+		public const LAND							:int = 9;
+		public const OF_LOITER						:int = 10;
+		public const APPROACH						:int = 11;
 
-		public const LOITER_MODE			:int = 1;
-		public const WP_MODE				:int = 2;
-		public const CIRCLE_MODE			:int = 3;
-		public const NO_NAV_MODE			:int = 4;
+		public const LOITER_MODE					:int = 1;
+		public const WP_MODE						:int = 2;
+		public const CIRCLE_MODE					:int = 3;
+		public const NO_NAV_MODE					:int = 4;
 
 
-		public const YAW_HOLD 				:int = 0;
-		public const YAW_ACRO 				:int = 1;
-		public const YAW_AUTO 				:int = 2;
-		public const YAW_LOOK_AT_HOME 		:int = 3;
+		public const YAW_HOLD 						:int = 0;
+		public const YAW_ACRO 						:int = 1;
+		public const YAW_AUTO 						:int = 2;
+		public const YAW_LOOK_AT_HOME 				:int = 3;
 
-		public const ROLL_PITCH_STABLE		:int = 0;
-		public const ROLL_PITCH_ACRO		:int = 1;
-		public const ROLL_PITCH_AUTO		:int = 2;
-		public const ROLL_PITCH_STABLE_OF	:int = 3;
+		public const ROLL_PITCH_STABLE				:int = 0;
+		public const ROLL_PITCH_ACRO				:int = 1;
+		public const ROLL_PITCH_AUTO				:int = 2;
+		public const ROLL_PITCH_STABLE_OF			:int = 3;
 
-		public const THROTTLE_MANUAL		:int = 0;
-		public const THROTTLE_HOLD			:int = 1;
-		public const THROTTLE_AUTO			:int = 2;
+		public const THROTTLE_MANUAL				:int = 0;
+		public const THROTTLE_HOLD					:int = 1;
+		public const THROTTLE_AUTO					:int = 2;
 
-		public const ASCENDING				:int = 1;
-		public const DESCENDING				:int = -1;
-		public const REACHED_ALT			:int = 0;
-		public const MINIMUM_THROTTLE		:int = 130;
-		public const MAXIMUM_THROTTLE		:int = 850;
-		public const RTL_APPROACH_DELAY		:int = 20;
-		public const WAYPOINT_SPEED_MIN		:int = 100;
-		public const THROTTLE_ADJUST		:int = 225;
+		public const ASCENDING						:int = 1;
+		public const DESCENDING						:int = -1;
+		public const REACHED_ALT					:int = 0;
+		public const MINIMUM_THROTTLE				:int = 130;
+		public const MAXIMUM_THROTTLE				:int = 850;
+		public const RTL_APPROACH_DELAY				:int = 20;
+		public const WAYPOINT_SPEED_MIN				:int = 100;
+		public const THROTTLE_ADJUST				:int = 225;
 
-		public const CH_1					:int = 0;
-		public const CH_2					:int = 1;
-		public const CH_3					:int = 2;
-		public const CH_4					:int = 3;
-		public const CH_5					:int = 4;
-		public const CH_6					:int = 5;
-		public const CH_7					:int = 6;
-		public const CH_8					:int = 7;
+		public const CH_1							:int = 0;
+		public const CH_2							:int = 1;
+		public const CH_3							:int = 2;
+		public const CH_4							:int = 3;
+		public const CH_5							:int = 4;
+		public const CH_6							:int = 5;
+		public const CH_7							:int = 6;
+		public const CH_8							:int = 7;
 
-		public const RADX100				:Number = 0.000174532925;
-		public const DEGX100				:Number = 5729.57795;
-		public const FS_COUNTER				:int = 3;
+		public const RADX100						:Number = 0.000174532925;
+		public const DEGX100						:Number = 5729.57795;
+		public const FS_COUNTER						:int = 3;
 
 		// AP Command enumeration
 		public const MAV_CMD_NAV_WAYPOINT			:int = 16;
@@ -179,13 +179,13 @@
 
 
 		//repeating events
-		public const NO_REPEAT 	 		:int = 0
-		public const CH_5_TOGGLE  		:int = 1
-		public const CH_6_TOGGLE  		:int = 2
-		public const CH_7_TOGGLE  		:int = 3
-		public const CH_8_TOGGLE  		:int = 4
-		public const RELAY_TOGGLE  		:int = 5
-		public const STOP_REPEAT 	 	:int = 10
+		public const NO_REPEAT 	 					:int = 0
+		public const CH_5_TOGGLE  					:int = 1
+		public const CH_6_TOGGLE  					:int = 2
+		public const CH_7_TOGGLE  					:int = 3
+		public const CH_8_TOGGLE  					:int = 4
+		public const RELAY_TOGGLE  					:int = 5
+		public const STOP_REPEAT 	 				:int = 10
 
 		public var flight_mode_strings				:Array;
 
@@ -195,233 +195,233 @@
 		// --------------------------------------
 		// Timers
 		// --------------------------------------
-		public var dTnav					:Number = 0.25;
-		public var G_Dt						:Number = 0.01;
-		public var m_dt						:Number = 0.1;
-		public var elapsed					:int = 0;
-		private var medium_loop_counter		:int = 0;
-		private var gps_counter				:int = 0;
-		private var fifty_toggle			:Boolean = false;
-		private var medium_loopCounter		:int = 0;
-		private var slow_loopCounter		:int = 0;
-		private var superslow_loopCounter	:int = 0;
-		private var auto_disarming_counter	:int = 0;
-		private var counter_one_herz		:int = 0;
+		public var dTnav							:Number = 0.25;
+		public var G_Dt								:Number = 0.01;
+		public var m_dt								:Number = 0.1;
+		public var elapsed							:int = 0;
+		private var medium_loop_counter				:int = 0;
+		private var gps_counter						:int = 0;
+		private var fifty_toggle					:Boolean = false;
+		private var medium_loopCounter				:int = 0;
+		private var slow_loopCounter				:int = 0;
+		private var superslow_loopCounter			:int = 0;
+		private var auto_disarming_counter			:int = 0;
+		private var counter_one_herz				:int = 0;
 
 
 		// --------------------------------------
 		// Telemetry and Sensors
 		// --------------------------------------
-		public var g_gps					:GPS;
-		public var baro						:Baro;
-		public var sonar					:Sonar;
-		public var next_WP					:Location;
-		public var prev_WP					:Location;
-		public var target_WP				:Location;
-		public var guided_WP				:Location;
-		public var current_loc				:Location;
-		public var home						:Location;
-		public var command_cond_queue		:Location;
-		public var command_nav_queue		:Location;
-		public var circle_WP				:Location;
+		public var g_gps							:GPS;
+		public var baro								:Baro;
+		public var sonar							:Sonar;
+		public var next_WP							:Location;
+		public var prev_WP							:Location;
+		public var target_WP						:Location;
+		public var guided_WP						:Location;
+		public var current_loc						:Location;
+		public var home								:Location;
+		public var command_cond_queue				:Location;
+		public var command_nav_queue				:Location;
+		public var circle_WP						:Location;
 
-		public var home_is_set				:Boolean;
+		public var home_is_set						:Boolean;
 
-		public var sensor_speed				:Vector3D;
-		private var alt_sensor_flag			:Boolean;
-		public var low_batt					:Boolean = false;
-		public var GPS_enabled				:Boolean = true;
-		public var event_undo_value			:Number = 0
-		public var event_id					:int = 0
+		public var sensor_speed						:Vector3D;
+		private var alt_sensor_flag					:Boolean;
+		public var low_batt							:Boolean = false;
+		public var GPS_enabled						:Boolean = true;
+		public var event_undo_value					:Number = 0
+		public var event_id							:int = 0
 
-		public var event_timer				:Number = 0;
-		public var event_value				:Number = 0;
-		public var event_repeat				:Number = 0;
-		public var event_delay				:Number = 0;
-		public var scaleLongUp				:Number = 1;
+		public var event_timer						:Number = 0;
+		public var event_value						:Number = 0;
+		public var event_repeat						:Number = 0;
+		public var event_delay						:Number = 0;
+		public var scaleLongUp						:Number = 1;
 
 		// --------------------------------------
 		// Plotting
 		// --------------------------------------
-		public var plotView					:PlotView;
-		public var plot_A					:int = 0;
-		public var plot_B					:int = 0;
-		public var plotType_A				:String = "";
-		public var plotType_B				:String = "";
-		public var fastPlot					:Boolean = false;
+		public var plotView							:PlotView;
+		public var plot_A							:int = 0;
+		public var plot_B							:int = 0;
+		public var plotType_A						:String = "";
+		public var plotType_B						:String = "";
+		public var fastPlot							:Boolean = false;
 
 
 		// -----------------------------------------
 		// Flight Modes
 		// -----------------------------------------
 		// The current desired control scheme for roll and pitch / navigation
-		public var roll_pitch_mode			:int = 0;
-		public var yaw_mode					:int = 0;
+		public var roll_pitch_mode					:int = 0;
+		public var yaw_mode							:int = 0;
 		// The current desired control scheme for altitude hold
-		public var throttle_mode			:int = 0;
-		public var throttle_avg				:Number = 0;
-		public var takeoff_complete			:Boolean = false;
+		public var throttle_mode					:int = 0;
+		public var throttle_avg						:Number = 0;
+		public var takeoff_complete					:Boolean = false;
 
-		public var circle_angle				:Number = 0;
-		public var circle_rate				:Number = 0.0872664625;
-		public var loiter_total				:Number = 0;
-		public var loiter_sum				:Number = 0;
-		public var loiter_time				:Number = 0;
-		public var loiter_time_max			:Number = 0;
+		public var circle_angle						:Number = 0;
+		public var circle_rate						:Number = 0.0872664625;
+		public var loiter_total						:Number = 0;
+		public var loiter_sum						:Number = 0;
+		public var loiter_time						:Number = 0;
+		public var loiter_time_max					:Number = 0;
 
 		// -----------------------------------------
 		// Climb rate control
 		// -----------------------------------------
 		// Time when we intiated command in millis - used for controlling decent rate
 		// The orginal altitude used to base our new altitude during decent
-		public var original_altitude		:Number = 0;
+		public var original_altitude				:Number = 0;
 		// Used to track the altitude offset for climbrate control
-		public var target_altitude			:Number = 0;
-		public var alt_change_timer			:Number = 0;
-		public var alt_change_flag			:int = 0;
-		public var alt_change				:Number = 0;
+		public var target_altitude					:Number = 0;
+		public var alt_change_timer					:Number = 0;
+		public var alt_change_flag					:int = 0;
+		public var alt_change						:Number = 0;
 
-		public var nav_thrust_z				:Number = 0;
+		public var nav_thrust_z						:Number = 0;
 
 		// -----------------------------------------
 		// Loiter and NAV
 		// -----------------------------------------
-		public var desired_speed			:Number = 0;
-		public var x_actual_speed			:Number = 0;
-		public var x_target_speed			:Number = 0;
-		public var p_loiter_rate			:Number = 0;
-		public var i_loiter_rate			:Number = 0;
-		public var d_loiter_rate			:Number = 0;
+		public var desired_speed					:Number = 0;
+		public var x_actual_speed					:Number = 0;
+		public var x_target_speed					:Number = 0;
+		public var p_loiter_rate					:Number = 0;
+		public var i_loiter_rate					:Number = 0;
+		public var d_loiter_rate					:Number = 0;
 
-		public var p_nav_rate				:Number = 0;
-		public var i_nav_rate				:Number = 0;
-		public var d_nav_rate				:Number = 0;
+		public var p_nav_rate						:Number = 0;
+		public var i_nav_rate						:Number = 0;
+		public var d_nav_rate						:Number = 0;
 
-		public var nav_lon					:Number = 0;
-		public var nav_roll					:Number = 0;
+		public var nav_lon							:Number = 0;
+		public var nav_roll							:Number = 0;
 
-		public var x_rate_error				:Number = 0;
+		public var x_rate_error						:Number = 0;
 
-		private var last_longitude			:Number	= 0;
+		private var last_longitude					:Number	= 0;
 
-		public var lon_filter				:AverageFilter;
-		private var nav_ok					:Boolean = false;
-		public var auto_roll				:Number = 0;
-		public var slow_wp					:Boolean = false;
-		public var waypoint_speed_gov		:int;
-		public var loiter_timer				:int = 0;
-		public var wp_control				:int = 0;
-		public var wp_verify_byte			:int = 0;
-		public var loiter_override			:Boolean = false;
-		public var crosstrack_error			:Number = 0;
-		public var last_ground_speed		:Number = 0;
-		public var long_error				:Number = 0;
-		public var long_error_old			:Number = 0;
-		public var baro_alt					:Number	= 0;
-		public var baro_rate				:Number	= 0;
-		public var sonar_rate				:Number	= 0;
-		public var sonar_alt				:Number	= 0;
-		public var old_sonar_alt			:Number	= 0;
-		public var old_baro_alt				:Number	= 0;
-		public var wp_distance				:int = 0;
-		public var home_distance			:int = 0;
-		public var home_to_copter_bearing	:Number = 0;
-		public var target_bearing			:Number = 0;
-		public var old_target_bearing		:Number = 0;
+		public var lon_filter						:AverageFilter;
+		private var nav_ok							:Boolean = false;
+		public var auto_roll						:Number = 0;
+		public var slow_wp							:Boolean = false;
+		public var waypoint_speed_gov				:int;
+		public var loiter_timer						:int = 0;
+		public var wp_control						:int = 0;
+		public var wp_verify_byte					:int = 0;
+		public var loiter_override					:Boolean = false;
+		public var crosstrack_error					:Number = 0;
+		public var last_ground_speed				:Number = 0;
+		public var long_error						:Number = 0;
+		public var long_error_old					:Number = 0;
+		public var baro_alt							:Number	= 0;
+		public var baro_rate						:Number	= 0;
+		public var sonar_rate						:Number	= 0;
+		public var sonar_alt						:Number	= 0;
+		public var old_sonar_alt					:Number	= 0;
+		public var old_baro_alt						:Number	= 0;
+		public var wp_distance						:int = 0;
+		public var home_distance					:int = 0;
+		public var home_to_copter_bearing			:Number = 0;
+		public var target_bearing					:Number = 0;
+		public var old_target_bearing				:Number = 0;
 
-		public var original_target_bearing	:Number = 0;
-		public var nav_bearing				:Number = 0;
-		public var jump						:int = -10;
-		public var command_cond_index		:int = 0;
-		public var prev_nav_index			:int = 0;
-		public var command_nav_index		:int = 0;
-
-
-		public var condition_value			:Number = 0;
-		public var condition_start			:Number = 0;
+		public var original_target_bearing			:Number = 0;
+		public var nav_bearing						:Number = 0;
+		public var jump								:int = -10;
+		public var command_cond_index				:int = 0;
+		public var prev_nav_index					:int = 0;
+		public var command_nav_index				:int = 0;
 
 
-		public var nav_yaw					:Number = 0;
-		public var auto_yaw					:Number = 0;
-		public var yaw_tracking 			:int 	= 1; 		//MAV_ROI_WPNEXT;
-		public var command_yaw_start		:Number = 0;
-		public var command_yaw_start_time	:Number = 0;
-		public var command_yaw_time			:Number = 0;
-		public var command_yaw_end			:Number = 0;
-		public var command_yaw_delta		:Number = 0;
-		public var command_yaw_speed		:Number = 0;
-		public var command_yaw_dir			:Number = 0;
-		public var command_yaw_relative		:Number = 0;
+		public var condition_value					:Number = 0;
+		public var condition_start					:Number = 0;
 
 
-		// -----------------------------------------
-		// GPS Latency patch
-		// -----------------------------------------
-		private var speed_old				:Number = 0;
+		public var nav_yaw							:Number = 0;
+		public var auto_yaw							:Number = 0;
+		public var yaw_tracking 					:int 	= 1; 		//MAV_ROI_WPNEXT;
+		public var command_yaw_start				:Number = 0;
+		public var command_yaw_start_time			:Number = 0;
+		public var command_yaw_time					:Number = 0;
+		public var command_yaw_end					:Number = 0;
+		public var command_yaw_delta				:Number = 0;
+		public var command_yaw_speed				:Number = 0;
+		public var command_yaw_dir					:Number = 0;
+		public var command_yaw_relative				:Number = 0;
+
 
 		// -----------------------------------------
 		// GPS Latency patch
 		// -----------------------------------------
-		public var failsafeCounter			:int = 0;
+		private var speed_old						:Number = 0;
+
+		// -----------------------------------------
+		// GPS Latency patch
+		// -----------------------------------------
+		public var failsafeCounter					:int = 0;
 
 		// -----------------------------------------
 		// Acro
 		// -----------------------------------------
-		public var roll_axis				:Number = 0;
-		public var do_flip					:Boolean = false;
-		public var AAP_timer				:int = 0;
-		public var AAP_state 				:int = 0;
-		public const AAP_THR_INC			:int = 180;
-		public const AAP_THR_DEC			:int = 90;
-		public const AAP_ROLL_OUT			:int = 2000;
+		public var roll_axis						:Number = 0;
+		public var do_flip							:Boolean = false;
+		public var AAP_timer						:int = 0;
+		public var AAP_state 						:int = 0;
+		public const AAP_THR_INC					:int = 180;
+		public const AAP_THR_DEC					:int = 90;
+		public const AAP_ROLL_OUT					:int = 2000;
 
 		// -----------------------------------------
 		// Stabilize
 		// -----------------------------------------
-		public var p_stab					:Number = 0;
-		public var i_stab					:Number = 0;
-		public var p_stab_rate				:Number = 0;
-		public var i_stab_rate				:Number = 0;
-		public var d_stab_rate				:Number = 0;
+		public var p_stab							:Number = 0;
+		public var i_stab							:Number = 0;
+		public var p_stab_rate						:Number = 0;
+		public var i_stab_rate						:Number = 0;
+		public var d_stab_rate						:Number = 0;
 
-		public var rate_error				:Number = 0;
+		public var rate_error						:Number = 0;
 
-		public var roll_last_rate			:Number = 0;
-		public var roll_servo_out			:Number = 0;
-		public var roll_rate_d_filter		:AverageFilter;
-		public var roll_scale_d				:Number = 0;
+		public var roll_last_rate					:Number = 0;
+		public var roll_servo_out					:Number = 0;
+		public var roll_rate_d_filter				:AverageFilter;
+		public var roll_scale_d						:Number = 0;
 
-		public var rate_d_dampener			:Number = 0;
-		public var control_roll				:Number = 0;
+		public var rate_d_dampener					:Number = 0;
+		public var control_roll						:Number = 0;
 		// -----------------------------------------
 		// Altitude hold
 		// -----------------------------------------
-		public var angle_boost				:Number = 0;
-		public var manual_boost				:Number = 0;
-		public var nav_throttle				:Number = 0;
-		public var z_target_speed			:Number = 0;
-		public var i_hold_rate				:Number = 0;
-		public var p_alt_rate				:Number = 0;
-		public var i_alt_rate				:Number = 0;
-		public var d_alt_rate				:Number = 0;
-		public var z_rate_error				:Number = 0;
+		public var angle_boost						:Number = 0;
+		public var manual_boost						:Number = 0;
+		public var nav_throttle						:Number = 0;
+		public var z_target_speed					:Number = 0;
+		public var i_hold_rate						:Number = 0;
+		public var p_alt_rate						:Number = 0;
+		public var i_alt_rate						:Number = 0;
+		public var d_alt_rate						:Number = 0;
+		public var z_rate_error						:Number = 0;
 
-		public var last_error				:Number	= 0;
-		public var throttle					:Number = 0;
-		public var err						:Number = 0;
-		public var altitude_error			:Number = 0;
-		public var old_altitude				:Number = 0;
-		public var old_alt					:Number = 0;
-		public var target					:Number = 500;
-		public var throttle_min				:Number = 0;
-		public var reset_throttle_flag		:Boolean = false;
+		public var last_error						:Number	= 0;
+		public var throttle							:Number = 0;
+		public var err								:Number = 0;
+		public var altitude_error					:Number = 0;
+		public var old_altitude						:Number = 0;
+		public var old_alt							:Number = 0;
+		public var target							:Number = 500;
+		public var throttle_min						:Number = 0;
+		public var reset_throttle_flag				:Boolean = false;
 
-		public var climb_rate				:Number = 0;
-		public var climb_rate_actual		:Number = 0;
-		public var climb_rate_error			:Number = 0;
-		public var landing_boost			:Number = 0;
-		public var land_complete			:Boolean = false;
-		public var ground_detector			:int = 0;
+		public var climb_rate						:Number = 0;
+		public var climb_rate_actual				:Number = 0;
+		public var climb_rate_error					:Number = 0;
+		public var landing_boost					:Number = 0;
+		public var land_complete					:Boolean = false;
+		public var ground_detector					:int = 0;
 
 		public function Main():void
 		{
