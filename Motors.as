@@ -2,24 +2,31 @@ package com {
 
 	public class Motors {
 
-		public var a_armed		:Boolean = false;
+		public var isAutoArmed		:Boolean = false;
+		public var isArmed			:Boolean = false;
 
 		public function Motors() {
 		}
 
 		public function set auto_armed(a:Boolean):void
 		{
-			a_armed = a;
+			isAutoArmed = a;
 		}
 
 		public function get auto_armed():Boolean
 		{
-			return a_armed;
+			return isAutoArmed;
 		}
 
-		public function armed():Boolean
+
+		public function set armed(a:Boolean):void
 		{
-			return true;
+			isArmed = a;
+		}
+
+		public function get armed():Boolean
+		{
+			return isArmed;
 		}
 
 	}
