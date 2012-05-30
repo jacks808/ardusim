@@ -8,7 +8,7 @@
 		public var l:Number = 0;
 
 		public var _copter_loc:Location;
-
+		public var enable_noise:Boolean;
 		public var altitude:Number = 0;
 
 		private var delay_array:Array;
@@ -72,7 +72,10 @@
 				index = 0;
 
 			//trace(altitude, _copter_loc.alt);
-			return altitude;// + scaleArray[index];
+			if(enable_noise)
+				return altitude + scaleArray[index];
+			else
+				return altitude;// + scaleArray[index];
 		}
 
 
