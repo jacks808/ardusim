@@ -400,7 +400,7 @@
 		public var manual_boost						:Number = 0;
 		public var nav_throttle						:Number = 0;
 		public var z_target_speed					:Number = 0;
-		public var i_hold_rate						:Number = 0;
+		public var i_hold							:Number = 0;
 		public var p_alt_rate						:Number = 0;
 		public var i_alt_rate						:Number = 0;
 		public var d_alt_rate						:Number = 0;
@@ -808,14 +808,10 @@
 					slow_loopCounter++;
 					superslow_loopCounter++;
 
-					// update throttle hold every 20 seconds
-					if(superslow_loopCounter > 60){
-						update_throttle_cruise();
-					}
-
-					//if(superslow_loopCounter > 1200){
+					if(superslow_loopCounter > 1200){
 						// save compass offsets
-					//}
+						superslow_loopCounter = 0;
+					}
 
 					// check the user hasn't updated the frame orientation
 					//if( !motors.armed ) {
@@ -1305,16 +1301,17 @@
 		// call at 10hz
 		public function get_nav_throttle(z_error:Number):Number
 		{
-			var output:Number
+			var output:Number = 0;
 
 			// convert to desired Rate:
 			z_target_speed 		= g.pi_alt_hold.get_p(z_error);			// calculate desired speed from lon error
 			z_target_speed		= constrain(z_target_speed, -250, 250);
 
 			// limit error to prevent I term wind up
+			z_error				= constrain(z_error, -400, 400);
 
 			// compensates throttle setpoint error for hovering
-			i_hold_rate			= g.pid_throttle.get_i(z_error , m_dt);			// calculate desired speed from lon error
+			i_hold				= g.pi_alt_hold.get_i(z_error , m_dt);			// calculate desired speed from lon error
 
 			// calculate rate error
 			z_rate_error		= z_target_speed - climb_rate;		// calc the speed error
@@ -1327,10 +1324,11 @@
 			if (Math.abs(climb_rate) < 20)
 				d_alt_rate = 0;
 
-			output					= p_alt_rate + i_alt_rate + i_hold_rate + d_alt_rate;
+			output					= p_alt_rate + i_alt_rate + d_alt_rate;
 			// limit the rate
 			output					= constrain(output, -80, 120);
-			return output + i_hold_rate;
+
+			return output + i_hold;
 		}
 
 		public function init_arm_motors():void
@@ -2770,7 +2768,6 @@
 			// Next_WP alt is our target alt
 			// It changes based on climb rate
 			// until it reaches the target_altitude
-			trace(next_WP.alt, current_loc.alt);
 			return next_WP.alt - current_loc.alt;
 		}
 
@@ -3626,6 +3623,8 @@
 			copter.velocity.x	= g.start_speed_BI.getNumber();
 			copter.position.x 	= g.start_position_BI.getNumber();
 			copter.position.z 	= g.start_height_BI.getNumber(); // add in some delay
+			baro.enable_noise	= g.baro_noise_checkbox.getSelected();
+
 			copter.loc.lng 		= copter.position.x;
 			copter.loc.alt 		= copter.position.z;
 			current_loc.lng		= copter.loc.lng;
@@ -3920,7 +3919,7 @@
 				break;
 
 				case "alt_hold_i":
-					val = i_hold_rate;
+					val = i_hold;
 				break;
 
 				case "alt_rate_p":
