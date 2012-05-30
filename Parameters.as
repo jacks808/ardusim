@@ -185,7 +185,7 @@ package com {
 		public var pi_alt_hold				:PID
 		public var pid_throttle				:PID
 		private var alt_hold_p				:Number = 0.5;
-		private var alt_hold_i				:Number = 0.015;
+		private var alt_hold_i				:Number = 0.007;
 		private var alt_hold_imax			:Number = 300;
 		private var throttle_rate_p			:Number = 0.25;
 		private var throttle_rate_i			:Number = 0.0;
@@ -276,6 +276,9 @@ package com {
 			originalX = this.x;
 			gps_checkbox.setLabel("GPS Estimator");
 			wind_checkbox.setLabel("Enable Wind");
+
+			baro_noise_checkbox.setLabel("Baro Noise");
+
 			initGains();
 		}
 
