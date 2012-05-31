@@ -39,6 +39,7 @@
 	import com.Sonar;
 	import com.Motors;
 	import com.Relay;
+	import com.APM_RC;
 
 
 	public class Main extends MovieClip
@@ -54,9 +55,11 @@
 		public var copter_lag						:MovieClip;
 		public var ahrs								:AHRS;
 		public var relay							:Relay;
+		public var apm_rc							:APM_RC;
 		public var motor_rpm						:Number = 0;
 		public var motor_pwm						:Number = 0;
 		public var failsafe							:Boolean = false;
+		public var radio_failure					:Boolean = false;
 
 		public var control_mode						:int = 2;
 		public var new_radio_frame					:Boolean = false;
@@ -64,6 +67,16 @@
 		public var colorIndex						:int = -1;
 		public var motors							:Motors;
 		public var waypoints						:Array;
+
+
+		public var ch_1_pwm							:int = 1500;
+		public var ch_2_pwm							:int = 1500;
+		public var ch_3_pwm							:int = 1500;
+		public var ch_4_pwm							:int = 1500;
+		public var ch_5_pwm							:int = 1500;
+		public var ch_6_pwm							:int = 1500;
+		public var ch_7_pwm							:int = 1500;
+
 
 		// --------------------------------------
 		// Defines
@@ -187,6 +200,17 @@
 		public const RELAY_TOGGLE  					:int = 5
 		public const STOP_REPEAT 	 				:int = 10
 
+		public const CH7_DO_NOTHING					:int = 0;
+		public const CH7_SET_HOVER 					:int = 1;
+		public const CH7_FLIP 						:int = 2;
+		public const CH7_SIMPLE_MODE 				:int = 3;
+		public const CH7_RTL 						:int = 4;
+		public const CH7_AUTO_TRIM 					:int = 5;
+		public const CH7_ADC_FILTER 				:int = 6;
+		public const CH7_SAVE_WP 					:int = 7;
+		public const CH_7_PWM_TRIGGER 	 			:int = 1800
+
+
 		public var flight_mode_strings				:Array;
 
 
@@ -208,6 +232,26 @@
 		private var auto_disarming_counter			:int = 0;
 		private var counter_one_herz				:int = 0;
 
+
+		////////////////////////////////////////////////////////////////////////////////
+		// LED output
+		////////////////////////////////////////////////////////////////////////////////
+		// status of LED based on the motor_armed variable
+		// Flashing indicates we are not armed
+		// Solid indicates Armed state
+		public var motor_light						:Boolean = false;
+		// Flashing indicates we are reading the GPS Strings
+		// Solid indicates we have full 3D lock and can navigate
+		public var GPS_light						:Boolean = false;
+		// This is current status for the LED lights state machine
+		// setting this value changes the output of the LEDs
+		public var led_mode  						:int = 0; //NORMAL_LEDS;
+		// Blinking indicates GPS status
+		public var copter_leds_GPS_blink 			:int = 0;
+		// Blinking indicates battery status
+		public var copter_leds_motor_blink	 		:int = 0;
+		// Navigation confirmation blinks
+		public var copter_leds_nav_blink 			:int = 0;
 
 		// --------------------------------------
 		// Telemetry and Sensors
@@ -268,6 +312,17 @@
 		public var loiter_sum						:Number = 0;
 		public var loiter_time						:Number = 0;
 		public var loiter_time_max					:Number = 0;
+
+		// -----------------------------------------
+		// Simple Mode
+		// -----------------------------------------
+		public var do_simple						:Boolean = false;
+		public var oldSwitchPosition				:int = 0;
+		public var initial_simple_bearing			:int = 0;
+		public var simple_counter					:int = 0;
+		public var trim_flag						:Boolean = false;
+		public var CH7_wp_index						:int = 0;
+
 
 		// -----------------------------------------
 		// Climb rate control
@@ -431,6 +486,7 @@
 			g_gps					= new GPS(copter.loc);
 			baro					= new Baro(copter.loc);
 			sonar					= new Sonar(copter.loc);
+			apm_rc					= new APM_RC();
 			next_WP					= new Location();
 			current_loc				= new Location();
 			home					= new Location();
@@ -442,6 +498,11 @@
 			roll_rate_d_filter		= new AverageFilter(3);
 			motors					= new Motors();
 			waypoints				= new Array();
+
+			// AP queues
+			command_nav_queue 		= new Location();
+			command_cond_queue 		= new Location();
+
 
 			sky.addChild(copter);
 			sky.addChild(ghost);
@@ -455,7 +516,7 @@
 			sky.current_loc = this.current_loc;
 
 			flight_mode_strings = new Array("STABILIZE","ACRO","ALT_HOLD","AUTO","GUIDED","LOITER","RTL","CIRCLE","POSITION","LAND","OF_LOITER");
-			colors = new Array(0xD6C274, 0xDB9E46, 0x25706B, 0x3D2423, 0xAB362E, 0xB5BC37, 0x2EBC5F, 0x54287D, 0x265A70, 0xA82DBC, 0xD9B64E, 0xF28B50, 0xF25E3D, 0x29735E, 0x6D78F4);
+			colors = new Array(0xD6C274, 0xDB9E46, 0x95706B, 0x9D2423, 0xAB362E, 0xB5BC37, 0x7EBC5F, 0x74287D, 0x765A70, 0xA82DBC, 0xD9B64E, 0xF28B50, 0xF25E3D, 0x79735E, 0x6D78F4);
 			populateMenus(plotMenu);
 			populateMenus(plotMenu2);
 
@@ -547,7 +608,8 @@
 			g = Parameters.getInstance();
 			g.visible = false;
 
-			stage.addEventListener(KeyboardEvent.KEY_UP,keyHandler);
+			stage.addEventListener(KeyboardEvent.KEY_UP,keyUpHandler);
+			stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDownHandler);
 
 			sim_controller.setLabel("Start Sim");
 			sim_controller.setEventName("RUN_SIM");
@@ -575,9 +637,9 @@
 
 
 			// setup radio
-			g.rc_1 = rc_roll;
-			g.rc_3 = rc_throttle;
-			g.rc_3.sticky = true;
+			//g.rc_1 = rc_roll;
+			//g.rc_3 = rc_throttle;
+			rc_throttle.sticky = true;
 
 			init_sim();
 
@@ -602,6 +664,7 @@
 				if(g.start_position_BI.getNumber() != 0)
 					copter.position.x = g.start_position_BI.getNumber();
 				sky.draw()
+				sky.failsafe_MC.visible = false;
 			}
 
 			// fake a GPS read
@@ -616,8 +679,7 @@
 
 		public function runSim(e:Event):void
 		{
-			// 50hz for a radio frame
-			new_radio_frame = true;
+			update_sim_radio();
 
 			// run twice to get 100hz updates
 			loop();
@@ -629,6 +691,7 @@
 			read_gps();
 
 			sky.draw();
+			sky.failsafe_MC.visible = radio_failure;
 		}
 
 		public function loop():void
@@ -705,8 +768,6 @@
 						plot(plotType_B, plot_B , 2);
 					}
 
-					//trace("rc_throttle", rc_throttle.knob.x);
-
 					medium_loopCounter++;
 					elapsed_time_tf.text = formatTime(elapsed) + " " + iteration.toString();
 					copter.speed = x_actual_speed;
@@ -769,6 +830,11 @@
 				//---------------------------------
 				case 4:
 					medium_loopCounter = 0;
+					// Accel trims 		= hold > 2 seconds
+					// Throttle cruise  = switch less than 1 second
+					// --------------------------------------------
+					read_trim_switch();
+
 					slow_loop();
 					break;
 
@@ -904,9 +970,9 @@
 
 				case ROLL_PITCH_STABLE:
 					// apply SIMPLE mode transform
-					//if(do_simple && new_radio_frame){
-					//	update_simple_mode();
-					//}
+					if(do_simple && new_radio_frame){
+						update_simple_mode();
+					}
 
 					// in this mode, nav_roll and nav_pitch = the iterm
 					g.rc_1.servo_out = get_stabilize_roll(g.rc_1.control_in);
@@ -917,9 +983,9 @@
 
 				case ROLL_PITCH_AUTO:
 					// apply SIMPLE mode transform
-					//if(do_simple && new_radio_frame){
-					//	update_simple_mode();
-					//}
+					if(do_simple && new_radio_frame){
+						update_simple_mode();
+					}
 					// mix in user control with Nav control
 					nav_roll			+= constrain(wrap_180(auto_roll  - nav_roll),  -g.auto_slew_rate, g.auto_slew_rate); // 40 deg a second
 					//nav_pitch			+= constrain(wrap_180(auto_pitch - nav_pitch), -g.auto_slew_rate.get(), g.auto_slew_rate.get()); // 40 deg a second
@@ -968,6 +1034,36 @@
 			}
 		}
 
+		// new radio frame is used to make sure we only call this at 50hz
+		public function update_simple_mode():void
+		{
+			var simple_sin_y:Number = 0;
+			var simple_cos_x:Number = 0;
+
+			// used to manage state machine
+			// which improves speed of function
+			simple_counter++;
+
+			var delta:int = wrap_360(ahrs.yaw_sensor - initial_simple_bearing)/100;
+
+			if (simple_counter == 1){
+				// roll
+				simple_cos_x = Math.sin(radians(90 - delta));
+
+			}else if (simple_counter > 2){
+				// pitch
+				simple_sin_y = Math.cos(radians(90 - delta));
+				simple_counter = 0;
+			}
+
+			// Rotate input by the initial bearing
+			var control_roll:int 	= g.rc_1.control_in   * simple_cos_x + g.rc_2.control_in * simple_sin_y;
+			var control_pitch:int 	= -(g.rc_1.control_in * simple_sin_y - g.rc_2.control_in * simple_cos_x);
+
+			g.rc_1.control_in = control_roll;
+			g.rc_2.control_in = control_pitch;
+		}
+
 		// 50 hz update rate
 		// controls all throttle behavior
 		public function update_throttle_mode():void
@@ -1009,6 +1105,7 @@
 						// so the props stop ... properly
 						// ----------------------------------------
 						g.rc_3.servo_out = 0;
+						takeoff_complete = false;
 					}
 					break;
 
@@ -1331,31 +1428,6 @@
 			return output + i_hold;
 		}
 
-		public function init_arm_motors():void
-		{
-			motors.armed = true;
-
-			// Reset home position
-			// -------------------
-			if(home_is_set)
-				init_home();
-
-			// all I terms are invalid
-			// -----------------------
-			reset_I_all();
-			update_arm_label();
-		}
-
-		public function init_disarm_motors():void
-		{
-			trace("Disarm Motors");
-			takeoff_complete = false;
-			//stopSIM();
-			motors.armed = false;
-			update_arm_label();
-			//g.throttle_cruise.save();
-		}
-
 		// Keeps old data out of our calculation / logs
 		public function reset_nav_params():void
 		{
@@ -1500,6 +1572,8 @@
 
 			i = constrain(i, 0, g.command_total);
 			//Serial.printf("set_command: %d with id: %d\n", i, temp.id);
+			trace("set_command: "+i+" with id: "+ temp.id);
+			report_wp();
 
 			// store home as 0 altitude!!!
 			// Home is always a MAV_CMD_NAV_WAYPOINT (16)
@@ -1573,8 +1647,9 @@
 			// Save Home to EEPROM
 			// -------------------
 			// no need to save this to EPROM
-			//set_cmd_with_index(home, 0);
-			//print_wp(home, 0);
+			set_cmd_with_index(home, 0);
+			trace("init_home")
+			print_wp(home, 0);
 
 			// Save prev loc this makes the calcs look better before commands are loaded
 			prev_WP = home.clone();
@@ -1600,31 +1675,38 @@
 			switch(command_nav_queue.id){
 
 				case MAV_CMD_NAV_TAKEOFF:	// 22
+					trace("do command takeoff")
 					do_takeoff();
 					break;
 
 				case MAV_CMD_NAV_WAYPOINT:	// 16  Navigate to Waypoint
+					trace("do command nav WP")
 					do_nav_wp();
 					break;
 
 				case MAV_CMD_NAV_LAND:	// 21 LAND to Waypoint
+					trace("do command Land")
 					yaw_mode 		= YAW_HOLD;
 					do_land();
 					break;
 
 				case MAV_CMD_NAV_LOITER_UNLIM:	// 17 Loiter indefinitely
+					trace("do command Loiter unlimited")
 					do_loiter_unlimited();
 					break;
 
 				case MAV_CMD_NAV_LOITER_TURNS:	//18 Loiter N Times
+					trace("do command Loiter n turns")
 					do_loiter_turns();
 					break;
 
 				case MAV_CMD_NAV_LOITER_TIME:  // 19
+					trace("do command Loiter time")
 					do_loiter_time();
 					break;
 
 				case MAV_CMD_NAV_RETURN_TO_LAUNCH: //20
+					trace("do command RTL")
 					do_RTL();
 					break;
 
@@ -1639,18 +1721,22 @@
 			switch(command_cond_queue.id){
 
 				case MAV_CMD_CONDITION_DELAY: // 112
+					trace("do command delay")
 					do_wait_delay();
 					break;
 
 				case MAV_CMD_CONDITION_DISTANCE: // 114
+					trace("do command distance")
 					do_within_distance();
 					break;
 
 				case MAV_CMD_CONDITION_CHANGE_ALT: // 113
+					trace("do command change alt")
 					do_change_alt();
 					break;
 
 				case MAV_CMD_CONDITION_YAW: // 115
+					trace("do command change Yaw")
 					do_yaw();
 					break;
 
@@ -1664,34 +1750,42 @@
 			switch(command_cond_queue.id){
 
 				case MAV_CMD_DO_JUMP:  // 177
+					trace("do command Jump")
 					do_jump();
 					break;
 
 				case MAV_CMD_DO_CHANGE_SPEED: // 178
+					trace("do command change speed")
 					do_change_speed();
 					break;
 
 				case MAV_CMD_DO_SET_HOME: // 179
+					trace("do command set home")
 					do_set_home();
 					break;
 
 				case MAV_CMD_DO_SET_SERVO: // 183
+					trace("do command set servo")
 					do_set_servo();
 					break;
 
 				case MAV_CMD_DO_SET_RELAY: // 181
+					trace("do command set relay")
 					do_set_relay();
 					break;
 
 				case MAV_CMD_DO_REPEAT_SERVO: // 184
+					trace("do command repeat servo")
 					do_repeat_servo();
 					break;
 
 				case MAV_CMD_DO_REPEAT_RELAY: // 182
+					trace("do command repeat relay")
 					do_repeat_relay();
 					break;
 
 				case MAV_CMD_DO_SET_ROI: // 201
+					trace("do command set ROI")
 					do_target_yaw();
 			}
 		}
@@ -2012,11 +2106,12 @@
 				// if we are low or don't seem to be decending much, increment ground detector
 				if(current_loc.alt < 40 || Math.abs(climb_rate) < 20) {
 					landing_boost++;  // reduce the throttle at twice the normal rate
-					if(ground_detector++ >= 30) {
+					if(ground_detector < 30) {
+						ground_detector++;
+					}else if (ground_detector == 30){
 						land_complete = true;
-						ground_detector = 30;
-						//icount = 1;
 						if(g.rc_3.control_in == 0){
+							ground_detector++;
 							init_disarm_motors();
 						}
 						return true;
@@ -2046,11 +2141,12 @@
 				if(Math.abs(climb_rate) < 20) {
 					//trace("climb_rate",climb_rate);
 					landing_boost++;
-					if(ground_detector++ >= 30) {
+					if(ground_detector < 30) {
+						ground_detector++;
+					}else if (ground_detector == 30){
 						land_complete = true;
-						ground_detector = 30;
-						trace("landed");
 						if(g.rc_3.control_in == 0){
+							ground_detector++;
 							init_disarm_motors();
 						}
 						return true;
@@ -2384,7 +2480,7 @@
 
 		public function do_set_servo():void
 		{
-			//APM_RC.OutputCh(command_cond_queue.p1 - 1, command_cond_queue.alt);
+			//apm_rc.OutputCh(command_cond_queue.p1 - 1, command_cond_queue.alt);
 		}
 
 		public function do_set_relay():void
@@ -2601,24 +2697,150 @@
 			}
 		}
 
+		// ---------------------------------------------------------------
+		// control_modes.pde
+		// ---------------------------------------------------------------
+		public function reset_control_switch():void
+		{
+			oldSwitchPosition = -1;
+			//read_control_switch();
+		}
+
+		// read at 10 hz
+		// set this to your trainer switch
+		public function read_trim_switch():void
+		{
+			// this is the normal operation set by the mission planner
+			if(g.ch7_option == CH7_SIMPLE_MODE){
+				do_simple = (g.rc_7.radio_in > CH_7_PWM_TRIGGER);
+
+			}else if (g.ch7_option == CH7_RTL){
+				if (trim_flag == false && g.rc_7.radio_in > CH_7_PWM_TRIGGER){
+					trim_flag = true;
+					set_mode(RTL);
+				}
+
+				if (trim_flag == true && g.rc_7.control_in < 800){
+					trim_flag = false;
+					if (control_mode == RTL || control_mode == LOITER){
+						reset_control_switch();
+					}
+				}
+
+			}else if (g.ch7_option == CH7_SAVE_WP){
+
+				if (g.rc_7.radio_in > CH_7_PWM_TRIGGER){ // switch is engaged
+					trim_flag = true;
+				}else{ // switch is disengaged
+					if(trim_flag){
+						trim_flag = false;
+
+						if(control_mode == AUTO){
+							// reset the mission
+							CH7_wp_index = 0;
+							g.command_total = 1;
+							set_mode(RTL);
+							return;
+						}
+
+						if(CH7_wp_index == 0){
+							// this is our first WP, let's save WP 1 as a takeoff
+							// increment index to WP index of 1 (home is stored at 0)
+							CH7_wp_index = 1;
+
+							// set our location ID to 16, MAV_CMD_NAV_WAYPOINT
+							current_loc.id = MAV_CMD_NAV_TAKEOFF;
+
+							// save command:
+							// we use the current altitude to be the target for takeoff.
+							// only altitude will matter to the AP mission script for takeoff.
+							// If we are above the altitude, we will skip the command.
+							trace("save loc");
+							set_cmd_with_index(current_loc, CH7_wp_index);
+						}
+
+						// increment index
+						CH7_wp_index++;
+
+						// set the next_WP (home is stored at 0)
+						// max out at 100 since I think we need to stay under the EEPROM limit
+						CH7_wp_index = constrain(CH7_wp_index, 1, 100);
+
+						if(g.rc_3.control_in > 0){
+							// set our location ID to 16, MAV_CMD_NAV_WAYPOINT
+							current_loc.id = MAV_CMD_NAV_WAYPOINT;
+						}else{
+							// set our location ID to 21, MAV_CMD_NAV_LAND
+							current_loc.id = MAV_CMD_NAV_LAND;
+						}
+
+						// save command
+						set_cmd_with_index(current_loc, CH7_wp_index);
+
+						copter_leds_nav_blink = 10;	// Cause the CopterLEDs to blink twice to indicate saved waypoint
+
+						// 0 = home
+						// 1 = takeoff
+						// 2 = WP 2
+						// 3 = command total
+					}
+				}
+			}else if (g.ch7_option == CH7_AUTO_TRIM){
+				//if (g.rc_7.radio_in > CH_7_PWM_TRIGGER){
+					//auto_level_counter = 10;
+				//}
+			}
+		}
+
+
+		// ---------------------------------------------------------------
+		// motors.pde
+		// ---------------------------------------------------------------
+
+		public function init_arm_motors():void
+		{
+			motors.armed = true;
+
+			// Reset home position
+			// -------------------
+			if(home_is_set)
+				init_home();
+
+			// all I terms are invalid
+			// -----------------------
+			reset_I_all();
+			update_arm_label();
+		}
+
+		public function init_disarm_motors():void
+		{
+			trace("Disarm Motors");
+			takeoff_complete = false;
+			//stopSIM();
+			motors.armed = false;
+			update_arm_label();
+			//g.throttle_cruise.save();
+		}
+
 		public function set_servos()
 		{
 			if(motors.armed){
 				copter.throttle = g.rc_3.servo_out;
 				//copter.throttle = nav_thrust_z; // g.rc_3.servo_out;
 
-				var target_rpm:Number;
+				//var target_rpm:Number;
+
+				// calc each motor mix before RPM.
 
 				motor_pwm			= g.rc_1.servo_out *.1;	// motor_pwm = 0 - 1000;
-				target_rpm			=  motor_pwm / 1000 * g.motor_kv; // 11.1 * 1000 * .8 = 8880;
+				//motor_rpm			= motor_pwm / 8880 * g.motor_kv; // 8880 = 1000 * 11.1 * .8
+				motor_rpm 			= (motor_pwm * g.motor_kv) / 1000;
+
 				//motor_rpm			+= constrain((target_rpm - motor_rpm), -400, 400);
 
-				//trace(motor_pwm, target_rpm);
+				trace(motor_pwm);
 
-				//motor_rpm			+= (target_rpm - motor_rpm);
-				motor_rpm			= target_rpm;
-
-				ahrs.omega.x 		+= motor_rpm * 1.4; 			//rpm_to_thrust; // tune for real life
+				ahrs.omega.x 		+= motor_rpm * 2.4; 			//rpm_to_thrust; // tune for real life
 				//trace("ahrs.omega.x")
 				ahrs.addToRoll(ahrs.omega.x * G_Dt);
 				//ahrs.roll_sensor 	+= ahrs.omega.x * G_Dt;
@@ -2628,11 +2850,10 @@
 			}
 		}
 
-		/// -*- tab-width: 4; Mode: C++; c-basic-offset: 4; indent-tabs-mode: nil -*-
-
 		// -----------------------------------------------------------------------------------
 		// Navigation
 		//------------------------------------------------------------------------------------
+
 		public function navigate():void
 		{
 
@@ -3173,55 +3394,58 @@
 		// radio.pde
 		// ----------------------------------------
 
+		public function default_dead_zones():void
+		{
+			g.rc_1.set_dead_zone(60);
+			g.rc_2.set_dead_zone(60);
+		    g.rc_3.set_dead_zone(60);
+			g.rc_4.set_dead_zone(80);
+		}
+
 		public function init_rc_in():void
 		{
 			// set rc channel ranges
+
 			g.rc_1.set_angle(4500);
-			//g.rc_2.set_angle(4500);
+			g.rc_2.set_angle(4500);
 			g.rc_3.set_range(MINIMUM_THROTTLE, MAXIMUM_THROTTLE);
-			//g.rc_4.set_angle(4500);
+			g.rc_4.set_angle(4500);
 
 			g.rc_1.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
-			//g.rc_2.set_type(RC_CHANNEL_ANGLE_RAW);
-			//g.rc_4.set_type(RC_CHANNEL_ANGLE_RAW);
+			g.rc_2.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
+			g.rc_4.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
 
 			//set auxiliary ranges
-			//g.rc_5.set_range(0,1000);
-			//g.rc_6.set_range(0,1000);
-			//g.rc_7.set_range(0,1000);
+			g.rc_5.set_range(0,1000);
+			g.rc_6.set_range(0,1000);
+			g.rc_7.set_range(0,1000);
 			//g.rc_8.set_range(0,1000);
-			g.rc_1.set_dead_zone(60);
+
 		}
 
 		public function init_rc_out():void
 		{
 			// nothing to do here
 
-
 		}
-
 
 		public function read_radio():void
 		{
-			/*
-			if (APM_RC.GetState() == 1){
+			if (apm_rc.getState() == 1){
 				new_radio_frame = true;
-				g.rc_1.set_pwm(APM_RC.InputCh(CH_1));
-				g.rc_2.set_pwm(APM_RC.InputCh(CH_2));
-				g.rc_3.set_pwm(APM_RC.InputCh(CH_3));
-				g.rc_4.set_pwm(APM_RC.InputCh(CH_4));
-				g.rc_5.set_pwm(APM_RC.InputCh(CH_5));
-				g.rc_6.set_pwm(APM_RC.InputCh(CH_6));
-				g.rc_7.set_pwm(APM_RC.InputCh(CH_7));
-				g.rc_8.set_pwm(APM_RC.InputCh(CH_8));
+				g.rc_1.set_pwm(apm_rc.InputCh(CH_1));
+				g.rc_2.set_pwm(apm_rc.InputCh(CH_2));
+				g.rc_3.set_pwm(apm_rc.InputCh(CH_3));
+				g.rc_4.set_pwm(apm_rc.InputCh(CH_4));
+				g.rc_5.set_pwm(apm_rc.InputCh(CH_5));
+				g.rc_6.set_pwm(apm_rc.InputCh(CH_6));
+				g.rc_7.set_pwm(apm_rc.InputCh(CH_7));
+				g.rc_8.set_pwm(apm_rc.InputCh(CH_8));
 
-				#if FRAME_CONFIG != HELI_FRAME
-					// limit our input to 800 so we can still pitch and roll
-					g.rc_3.control_in = min(g.rc_3.control_in, MAXIMUM_THROTTLE);
-				#endif
+				// limit our input to 800 so we can still pitch and roll
+				g.rc_3.control_in = Math.min(g.rc_3.control_in, MAXIMUM_THROTTLE);
 
-
-			}*/
+			}
 			throttle_failsafe(g.rc_3.radio_in);
 		}
 
@@ -3357,9 +3581,9 @@
 
 				if (event_id >= CH_5 && event_id <= CH_8) {
 					if(event_repeat%2) {
-						APM_RC.OutputCh(event_id, event_value); // send to Servos
+						apm_rc.OutputCh(event_id, event_value); // send to Servos
 					} else {
-						APM_RC.OutputCh(event_id, event_undo_value);
+						apm_rc.OutputCh(event_id, event_undo_value);
 					}
 				}
 
@@ -3439,7 +3663,7 @@
 					throttle_mode 	= THROTTLE_AUTO;
 
 					// loads the commands from where we left off
-					//init_commands();
+					init_commands();
 					break;
 
 				case CIRCLE:
@@ -3567,6 +3791,7 @@
 		private function graphHandler(e:Event):void
 		{
 			plotView.clearPlots();
+			colorIndex = 0;
 			stopSIM();
 		}
 
@@ -3646,7 +3871,7 @@
 			failsafe 			= false;
 			takeoff_complete	= false;
 			failsafeCounter		= 0;
-			rc_throttle.failed  = false;
+			radio_failure 		= false;
 
 
 
@@ -3673,17 +3898,75 @@
 
 			// radio
 			init_rc_in();
+			init_rc_out();
+			default_dead_zones();
+			// sets throttle to be at hovering setpoint
+			rc_throttle.knob.x = 6;
+
+			// setup a fake AP misison
+			var loc:Location = new Location();
+			loc.id = 16;
+
+			loc.lng = -1000;
+			loc.alt = 500;
+			set_cmd_with_index(loc, 1);
+
+			loc.lng = 0;
+			loc.alt = 500;
+			set_cmd_with_index(loc, 2);
+
+			loc.lng = 1000;
+			loc.alt = 500;
+			set_cmd_with_index(loc, 3);
+
+			loc.lng = 0;
+			loc.alt = 500;
+			set_cmd_with_index(loc, 4);
+
+			loc.id = 21;
+			loc.alt = 0;
+			set_cmd_with_index(loc, 5);
+		}
+
+
+		public function update_sim_radio():void
+		{
+			//
+			//read out rc_throttle and rc_roll
+
+			if(radio_failure){
+				ch_3_pwm = 1500;
+			}else{
+				ch_3_pwm = rc_throttle.pwm;
+				ch_1_pwm = rc_roll.pwm;
+			}
+
+			apm_rc.set_PWM_channel(ch_1_pwm,	 	CH_1);
+			apm_rc.set_PWM_channel(ch_2_pwm, 		CH_2);
+			apm_rc.set_PWM_channel(ch_3_pwm,	 	CH_3);
+			apm_rc.set_PWM_channel(ch_4_pwm, 		CH_4);
+			apm_rc.set_PWM_channel(ch_5_pwm, 		CH_5);
+			apm_rc.set_PWM_channel(ch_6_pwm, 		CH_6);
+			apm_rc.set_PWM_channel(ch_7_pwm, 		CH_7);
+			//apm_rc.set_PWM_channel(ch_8_pwm, 		CH_8);
 		}
 
 		// -----------------------------------------------------------------------------------
 		// GUI Handlers
 		//------------------------------------------------------------------------------------
-		private function keyHandler(k:KeyboardEvent):void
+		private function keyDownHandler(k:KeyboardEvent):void
+		{
+			switch(k.keyCode){
+				case 118:  // F7 or channel 7
+					ch_7_pwm = 1900;
+					break;
+			}
+
+		}
+
+		private function keyUpHandler(k:KeyboardEvent):void
 		{
 			trace(k.keyCode);
-			if (k.keyCode == Keyboard.SPACE){
-				gainsHandler(null);
-			}
 
 			if(k.shiftKey){
 				switch(k.keyCode){
@@ -3727,9 +4010,20 @@
 			}
 
 			switch(k.keyCode){
+				case Keyboard.SPACE:
+					gainsHandler(null);
+					break;
+
+				case 87:  // w for waypoint dump
+					report_wp();
+					break;
+
+				case 118:  // F7 or channel 7
+					ch_7_pwm = 1200;
+					break;
 
 				case 70: // f for fail
-					rc_throttle.failed = !rc_throttle.failed;
+					radio_failure = !radio_failure
 					trace("RC Failure");
 					break;
 
@@ -3738,8 +4032,13 @@
 					break;
 
 				case 72: // h for hover
-					rc_throttle.knob.x = 10;
+					rc_throttle.knob.x = 6;
 					break;
+
+				case 76: // l for loop
+					do_flip = true;
+					break;
+
 
 				case 76: // l for loop
 					do_flip = true;
@@ -3976,6 +4275,24 @@
 		// -----------------------------------------------------------------------------------
 		// Utility functions
 		//------------------------------------------------------------------------------------
+		public function report_wp(index:int = 255)
+		{
+			var temp:Location;
+			if(index == 255){
+				for(var i:int = 0; i < g.command_total; i++){
+					temp = get_cmd_with_index(i);
+					print_wp(temp, i);
+				}
+			}else{
+				temp = get_cmd_with_index(index);
+				print_wp(temp, index);
+			}
+		}
+
+		public function print_wp(cmd:Location, index:int)
+		{
+			trace("cmd#: " + index + " id:" + cmd.id + " op:" + cmd.options + " p1:" + cmd.p1 + " p2:" + cmd.alt + " p3:" + cmd.lat + " p4:" + cmd.lng);
+		}
 
 		// call at 50hz
 		public function read_gps():void
