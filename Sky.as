@@ -24,6 +24,7 @@ package com {
 	{
 		//public var lines			:int = 4;
 		public var copter_XY		:Point;
+		public var ghost_XY			:Point;
 		public var frame			:Rectangle;
 		public var copter			:Copter;
 		public var copter_lag		:MovieClip;
@@ -32,13 +33,16 @@ package com {
 		public var current_loc		:Location;
 		public var x_page			:int;
 		public var y_page			:int;
+		public var x_page_g			:int;
+		public var y_page_g			:int;
 
 
 		public function Sky(){
 			super();
 			addEventListener(Event.ADDED_TO_STAGE, addedToStage);
-			frame = new Rectangle(0,0,100,100);
-			copter_XY = new Point(0,0);
+			frame 			= new Rectangle(0,0,100,100);
+			copter_XY 		= new Point(0,0);
+			ghost_XY 		= new Point(0,0);
 		}
 
 		public function draw():void
@@ -54,7 +58,10 @@ package com {
 			if (copter.y < 0)
 				copter.y	+= frame.height;
 
-			calc_page();
+			calc_copter_page();
+
+			grass.visible = (y_page == 0);
+			grass.scaleX  = ((x_page % 2) == 0) ? 1 : -1;
 
 			//-----------------------------------------------------------------
 
@@ -70,15 +77,19 @@ package com {
 
 			//-----------------------------------------------------------------
 
-			ghost.x 		= frame.width/2 + controller.next_WP.lng * 1.123;
-			ghost.x 		= ghost.x % frame.width;
+			ghost_XY.x 		= frame.width/2 + controller.next_WP.lng * 1.123;
+			ghost.x 		= ghost_XY.x % frame.width;
 			if (ghost.x < 0)
 				ghost.x	+= frame.width;
 
-			ghost.y 		= frame.height - Math.max(controller.next_WP.alt, 0);
-			ghost.y 		= ghost.y % frame.height;
+			ghost_XY.y 		= frame.height - Math.max(controller.next_WP.alt, 0);
+			ghost.y 		= ghost_XY.y % frame.height;
 			if (ghost.y < 0)
 				ghost.y	+= frame.height;
+
+			calc_ghost_page();
+
+			ghost.visible = ((x_page == x_page_g) && (y_page == y_page_g));
 
 			//-----------------------------------------------------------------
 
@@ -90,13 +101,22 @@ package com {
 			//speed_TF.text 	= Math.floor(copter.speed) +"cm/s";
 		}
 
-		public function calc_page():void
+		public function calc_copter_page():void
 		{
 			x_page		= copter_XY.x / frame.width;
 			y_page		= (frame.height - copter_XY.y) / frame.height;
 
 			if (copter_XY.x  < 0)
 				x_page--;
+		}
+
+		public function calc_ghost_page():void
+		{
+			x_page_g		= ghost_XY.x / frame.width;
+			y_page_g		= (frame.height - ghost_XY.y) / frame.height;
+
+			if (ghost_XY.x  < 0)
+				x_page_g--;
 		}
 
 
@@ -112,20 +132,3 @@ package com {
 		}
 	}
 }
-
-
-			/*
-			new_frame		= copter_XY.x / frame.width;
-
-			if (copter_XY.x  < 0)
-				new_frame--;
-
-			if(new_frame != x_page){
-				update_x_text();
-				x_page = new_frame;
-			}
-
-
-			if (copter.x < 0)
-				copter.x	+= frame.width;
-			*/
