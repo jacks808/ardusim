@@ -27,12 +27,8 @@ package com {
 	import flash.text.TextField;
 	import flash.ui.Keyboard;
 
-	public class RC_Channel extends MovieClip
+	public class RC_Channel extends Object
 	{
-		// GUI
-		public var pressed					:Boolean = false;
-		public var sticky					:Boolean = false;
-
 		public const RC_CHANNEL_ANGLE		:int = 0;
 		public const RC_CHANNEL_RANGE		:int = 1;
 		public const RC_CHANNEL_ANGLE_RAW	:int = 2;
@@ -56,55 +52,9 @@ package com {
 		public var _high					:Number = 1;
 		public var _low						:Number = 0;
 
-		public var failed					:Boolean = false;
-
 		public function RC_Channel()
 		{
-			addEventListener(Event.ADDED_TO_STAGE, addedToStage);
 		}
-		// ========================================================
-		//  Flash glue
-		// ========================================================
-	    public function addedToStage(even:Event):void
-		{
-			knob.addEventListener(MouseEvent.MOUSE_UP, mouseUp);
-			knob.addEventListener(MouseEvent.MOUSE_DOWN, mouseDown);
-			addEventListener(Event.ENTER_FRAME, update);
-		}
-
-		private function update(e:Event)
-		{
-			if(pressed){
-				knob.x = mouseX;
-				knob.x = Math.min(knob.x, 100);
-				knob.x = Math.max(knob.x, -100);
-			}else{
-				if(sticky == false)
-					knob.x = knob.x /2;
-
-			}
-			if(failed)
-				set_pwm(900);
-			else
-				set_pwm(1000 + (knob.x + 100) * 5)
-			//control_in = knob.x * 45;
-		}
-
-		private function mouseDown(e:MouseEvent)
-		{
-			pressed = true;
-			stage.addEventListener(MouseEvent.MOUSE_UP, mouseUp);
-		}
-
-		private function mouseUp(e:MouseEvent)
-		{
-			pressed = false;
-			stage.removeEventListener(MouseEvent.MOUSE_UP, mouseUp);
-		}
-
-		// ========================================================
-		//  AC code
-		// ========================================================
 
 		public function set_range(low:int, high:int):void
 		{
