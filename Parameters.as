@@ -34,14 +34,14 @@ package com {
 		// Sim Details controls
 		// ---------------------------------------------
 		public var sim_iterations			:int = 5000;
-		public var windSpeedMin				:Number = 100;
-		public var windSpeedMax				:Number = 200;
-		public var windPeriod				:Number = 12000;
+		public var windSpeedMin				:Number = 25;
+		public var windSpeedMax				:Number = 100;
+		public var windPeriod				:Number = 30000;
 		public var airDensity				:Number = 1.184;
 		public var crossSection				:Number = 0.0325;  // 3.3° at 1m/s wind , 7° at 1.5m/s wind, 12° at 2m/s wind 22° at 2.5m/s wind
 		public var dragCE					:Number = 0.25;
 		public var speed_filter_size		:Number = 2;
-		public var motor_kv					:Number = 6880;
+		public var motor_kv					:Number = 1000;
 
 		public var motor_kv_BI				:BasicInput;
 		public var wind_high_BI				:BasicInput;
@@ -88,7 +88,7 @@ package com {
 		public var throttle_fs_enabled		:Boolean = true;
 		public var throttle_fs_action		:int = 2
 		public var throttle_fs_value		:int = 975
-		public var throttle_cruise			:Number = 526;
+		public var throttle_cruise			:Number = 500;
 		public var throttle_cruise_e		:Number = 0;
 
 		// ---------------------------------------------
@@ -227,6 +227,7 @@ package com {
 		public var crosstrack_gain			:int = 1;
 		public var auto_land_timeout		:Number = 10000;// milliseconds
 
+		public var ch7_option				:int = 7; //CH7_SAVE_WP
 
 		public function Parameters():void
 		{
@@ -236,9 +237,9 @@ package com {
 			frame 		= new Rectangle(0,0,250,450);
 
 			// radio
-			//rc_1	= new RC_Channel();  // onscreen
+			rc_1	= new RC_Channel(); // instantiated onscreen
 			rc_2	= new RC_Channel();
-			//rc_3	= new RC_Channel();
+			rc_3	= new RC_Channel();	// instantiated onscreen
 			rc_4	= new RC_Channel();
 			rc_5	= new RC_Channel();
 			rc_6	= new RC_Channel();
@@ -342,6 +343,9 @@ package com {
 			wind_high_BI.setNumber(windSpeedMax);
 			wind_period_BI.setNumber(windPeriod/1000);
 			start_speed_BI.setNumber(0);
+
+			motor_kv_BI.setNumber(motor_kv);
+
 		}
 
 		public function updateGains():void
@@ -393,6 +397,8 @@ package com {
 			airDensity					= airDensity_BI.getNumber();
 			crossSection				= crossSection_BI.getNumber();
 			speed_filter_size			= speed_filter_BI.getNumber();
+
+			motor_kv					= motor_kv_BI.getNumber();
 		}
 
 
