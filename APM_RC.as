@@ -16,11 +16,14 @@ package com {
 		// input channels from PPM encoder
 
 		var pwm_channels:Array;
+		var output_pwm:Array;
+
 		var state:int = 0;
 
 		public function APM_RC()
 		{
 			pwm_channels = new Array(8);
+			output_pwm = new Array(8);
 		}
 
 		// set by SIM
@@ -33,6 +36,17 @@ package com {
 		public function InputCh(ch:int):int
 		{
 			return  pwm_channels[ch];
+		}
+
+		public function outputCh(ch:int, pwm:int):int
+		{
+			//trace("outputCH",ch, pwm);
+			return  output_pwm[ch] = pwm;
+		}
+
+		public function get_motor_output(ch:int):int
+		{
+			return output_pwm[ch] - 1000;
 		}
 
 		public function getState():int
