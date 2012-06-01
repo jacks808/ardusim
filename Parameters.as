@@ -57,6 +57,7 @@ package com {
 		// -----------------------------------------
 		// Environment
 		// -----------------------------------------
+		public var start_angle_BI			:BasicInput;
 		public var start_speed_BI			:BasicInput;
 		public var start_position_BI		:BasicInput;
 		public var start_height_BI			:BasicInput;
@@ -68,6 +69,8 @@ package com {
 		public var wind_period_BI			:BasicInput;
 		public var wind_checkbox			:QuickCheckBox;
 		public var gps_checkbox				:QuickCheckBox;	// for Ryan's estimator
+		public var fastPlot_checkbox		:QuickCheckBox;	// for Ryan's estimator
+
 
 		// Logging
 		public var NTUN_checkbox				:QuickCheckBox;	// for Ryan's estimator
@@ -277,6 +280,7 @@ package com {
 			originalX = this.x;
 			gps_checkbox.setLabel("GPS Estimator");
 			wind_checkbox.setLabel("Enable Wind");
+			fastPlot_checkbox.setLabel("Fast plot");
 
 			baro_noise_checkbox.setLabel("Baro Noise");
 
@@ -343,6 +347,7 @@ package com {
 			wind_high_BI.setNumber(windSpeedMax);
 			wind_period_BI.setNumber(windPeriod/1000);
 			start_speed_BI.setNumber(0);
+			start_angle_BI.setNumber(0);
 
 			motor_kv_BI.setNumber(motor_kv);
 
