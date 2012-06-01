@@ -116,26 +116,13 @@
 
 			ahrs.omega.x = radiansx100(ahrs.roll_speed.x);
 
-			//trace(ahrs.omega.x);
-
-			//roll_sensor = wrap_180(roll_sensor);
-
 			// calc thrust
 			//get_motor_output returns 0 : 1000
 			thrust += apm_rc.get_motor_output(0) * thrust_scale;
 			thrust += apm_rc.get_motor_output(1) * thrust_scale;
 
-			//1667.7 850 850 0.981
-
-			//trace(thrust, apm_rc.get_motor_output(0), apm_rc.get_motor_output(1), thrust_scale)
-			//trace(apm_rc.get_motor_output(0))
-
 			//rotaional drag
 			//rot_accel.x -= ahrs.omega.x;
-
-
-			//var _accel_:Number 	= (thrust * thrust_scale);
-
 
 			accel.x 	= Math.sin(radiansx100(ahrs.roll_sensor)) * thrust;
 			accel.z 	= Math.cos(radiansx100(ahrs.roll_sensor)) * thrust;

@@ -982,6 +982,7 @@
 					//g.rc_1.control_in = constrain(g.rc_1.control_in, -1300, 1300);
 					// in this mode, nav_roll and nav_pitch = the iterm
 					g.rc_1.servo_out = get_stabilize_roll(g.rc_1.control_in);
+
 					//g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in);
 
 					control_roll = g.rc_1.control_in; // debugging
