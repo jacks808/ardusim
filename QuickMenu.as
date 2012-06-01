@@ -43,6 +43,8 @@ package com {
         	item.menu = this;
         	item.index = items.length -1;
 			//trace("addItem", items.length)
+			item.frame.width = frame.width;
+
         	this.addChild(item);
 			if(current_index < 0){
 				current_index = 0;
@@ -55,6 +57,7 @@ package com {
         	items.push(item);
         	item.menu = this;
         	item.index = items.length -1;
+			item.frame.width = frame.width;
 
 			//trace("addItem", items.length)
         	this.addChild(item);
