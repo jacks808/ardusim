@@ -49,8 +49,12 @@ package com {
 		public var _reverse					:Number = 1;
 		public var _dead_zone				:Number = 0;
 		public var _type					:Number = 0;
-		public var _high					:Number = 1;
-		public var _low						:Number = 0;
+
+		public var _high_in					:Number = 1;
+		public var _low_in					:Number = 0;
+
+		public var _high_out				:Number = 1;
+		public var _low_out					:Number = 0;
 
 		public function RC_Channel()
 		{
@@ -58,16 +62,25 @@ package com {
 
 		public function set_range(low:int, high:int):void
 		{
-			_type 	= RC_CHANNEL_RANGE;
-			_high 	= high;
-			_low 	= low;
+			_type 		= RC_CHANNEL_RANGE;
+			_high_in 	= high;
+			_low_in 	= low;
+			_high_out 	= high;
+			_low_out 	= low;
+		}
+
+
+		public function set_range_out(low:int, high:int):void
+		{
+			_high_out 	= high;
+			_low_out 	= low;
 		}
 
 
 		public function set_angle(angle:int):void
 		{
-			_type 	= RC_CHANNEL_ANGLE;
-			_high 	= angle;
+			_type 		= RC_CHANNEL_ANGLE;
+			_high_in 	= angle;
 		}
 
 		public function set_dead_zone(dzone:int):void
@@ -118,14 +131,14 @@ package com {
 				else
 					radio_in = (pwm + radio_in) >> 1;		// Small filtering
 			}else{
-				radio_in = pwm;
+				radio_in = constrain(pwm, radio_min, radio_max);
 			}
 
 			if(_type == RC_CHANNEL_RANGE){
 				//Serial.print("range ");
 				control_in = pwm_to_range();
-				//control_in = constrain(control_in, _low, _high);
-				control_in = Math.min(control_in, _high);
+				//control_in = constrain(control_in, _low_in, _high_in);
+				control_in = Math.min(control_in, _high_in);
 				control_in = (control_in < _dead_zone) ? 0 : control_in;
 
 				if (Math.abs(scale_output) != 1){
@@ -145,7 +158,7 @@ package com {
 				// coming soon ??
 				if(expo) {
 					long temp = control_in;
-					temp = (temp * temp) / _high;
+					temp = (temp * temp) / _high_in;
 					control_in = (int)((control_in >= 0) ? temp : -temp);
 				}*/
 			}
@@ -153,7 +166,7 @@ package com {
 
 		public function control_mix(value:Number):Number
 		{
-			return (1 - Math.abs(control_in / _high)) * value + control_in;
+			return (1 - Math.abs(control_in / _high_in)) * value + control_in;
 		}
 
 		// are we below a threshold?
@@ -168,6 +181,7 @@ package com {
 		{
 			if(_type == RC_CHANNEL_RANGE){
 				pwm_out 	= range_to_pwm();
+				//trace(pwm_out);
 				radio_out 	= (_reverse >= 0) ? (radio_min + pwm_out) : (radio_max - pwm_out);
 
 			}else if(_type == RC_CHANNEL_ANGLE_RAW){
@@ -231,9 +245,9 @@ package com {
 				return 0;
 
 			if(radio_in > radio_trim_high){
-				return _reverse * (_high * (radio_in - radio_trim_high)) / (radio_max  - radio_trim_high);
+				return _reverse * (_high_in * (radio_in - radio_trim_high)) / (radio_max  - radio_trim_high);
 			}else if(radio_in < radio_trim_low){
-				return _reverse * (_high * (radio_in - radio_trim_low)) / (radio_trim_low - radio_min);
+				return _reverse * (_high_in * (radio_in - radio_trim_low)) / (radio_trim_low - radio_min);
 			}else
 				return 0;
 		}
@@ -243,9 +257,9 @@ package com {
 		public function angle_to_pwm():Number
 		{
 			if((servo_out * _reverse) > 0)
-				return _reverse * (servo_out * (radio_max - radio_trim)) / _high;
+				return _reverse * (servo_out * (radio_max - radio_trim)) / _high_out;
 			else
-				return _reverse * (servo_out * (radio_trim - radio_min)) / _high;
+				return _reverse * (servo_out * (radio_trim - radio_min)) / _high_out;
 		}
 
 		// ------------------------------------------
@@ -256,16 +270,18 @@ package com {
 			var radio_trim_low:int = radio_min + _dead_zone;
 
 			if(radio_in > radio_trim_low)
-				return (_low + ((_high - _low) * (radio_in - radio_trim_low)) / (radio_max - radio_trim_low));
-			else
+				return (_low_in + ((_high_in - _low_in) * (radio_in - radio_trim_low)) / (radio_max - radio_trim_low));
+			else if(_dead_zone > 0)
 				return 0;
+			else
+				return _low_out;
 		}
 
 
 
 		public function range_to_pwm():Number
 		{
-			return ((servo_out - _low) * (radio_max - radio_min)) / (_high - _low);
+			return ((servo_out - _low_out) * (radio_max - radio_min)) / (_high_out - _low_out);
 		}
 
 		// ------------------------------------------
@@ -288,10 +304,6 @@ package com {
 				return (radio_out - mid) / (radio_max  - mid);
 		}
 
-		//public function set_apm_rc( APM_RC_Class * apm_rc ):void
-		//{
-		//	_apm_rc = apm_rc;
-		//}
 		public function constrain(val:Number, min:Number, max:Number):Number
 		{
 			val = Math.max(val, min);
@@ -302,86 +314,5 @@ package com {
 
 	}
 }
-
-
-
-
-/*
-package com {
-	import flash.display.MovieClip;
-    import flash.display.Sprite;
-    import flash.display.Stage;
-    import flash.display.StageDisplayState;
-
-	import flash.display.DisplayObject;
-    import flash.events.*;
-	import flash.geom.Rectangle;
-	import flash.geom.Point;
-	import flash.geom.Vector3D;
-    import flash.display.StageAlign;
-    import flash.display.StageScaleMode;
-    import flash.utils.*;
-
-	import flash.text.TextField;
-	import flash.ui.Keyboard;
-
-	public class RC_Channel extends MovieClip
-	{
-		// GUI
-		public var pressed			:Boolean = false;
-		public var sticky			:Boolean = false;
-
-		// AC
-		public var control_in		:Number  = 0;
-		public var servo_out		:Number  = 0;
-
-		public var _high			:Number = 4500;
-
-		public function RC_Channel()
-		{
-			addEventListener(Event.ADDED_TO_STAGE, addedToStage);
-		}
-
-	    public function addedToStage(even:Event):void
-		{
-			knob.addEventListener(MouseEvent.MOUSE_UP, mouseUp);
-			knob.addEventListener(MouseEvent.MOUSE_DOWN, mouseDown);
-			addEventListener(Event.ENTER_FRAME, update);
-		}
-
-		public function control_mix(value:Number):Number
-		{
-			return (1 - Math.abs(control_in / _high)) * value + control_in;
-		}
-
-		private function update(e:Event)
-		{
-			if(pressed){
-				knob.x = mouseX;
-				knob.x = Math.min(knob.x, 100);
-				knob.x = Math.max(knob.x, -100);
-			}else{
-				if(sticky == false)
-					knob.x = knob.x /2;
-			}
-			control_in = knob.x * 45;
-		}
-
-		private function mouseDown(e:MouseEvent)
-		{
-			pressed = true;
-			stage.addEventListener(MouseEvent.MOUSE_UP, mouseUp);
-		}
-
-		private function mouseUp(e:MouseEvent)
-		{
-			pressed = false;
-			stage.removeEventListener(MouseEvent.MOUSE_UP, mouseUp);
-		}
-
-	}
-}
-
-*/
 
 
