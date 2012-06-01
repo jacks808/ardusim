@@ -77,7 +77,7 @@
 		public var ch_6_pwm							:int = 1500;
 		public var ch_7_pwm							:int = 1500;
 
-
+		public var motor_out						:Array;
 		// --------------------------------------
 		// Defines
 		// --------------------------------------
@@ -131,6 +131,11 @@
 		public const CH_6							:int = 5;
 		public const CH_7							:int = 6;
 		public const CH_8							:int = 7;
+
+		public const MOT_1							:int = 0;
+		public const MOT_2							:int = 1;
+
+
 
 		public const RADX100						:Number = 0.000174532925;
 		public const DEGX100						:Number = 5729.57795;
@@ -292,7 +297,7 @@
 		public var plot_B							:int = 0;
 		public var plotType_A						:String = "";
 		public var plotType_B						:String = "";
-		public var fastPlot							:Boolean = false;
+		public var fastPlot							:Boolean = true;
 
 
 		// -----------------------------------------
@@ -439,7 +444,7 @@
 		public var i_stab_rate						:Number = 0;
 		public var d_stab_rate						:Number = 0;
 
-		public var rate_error						:Number = 0;
+		public var roll_rate_error					:Number = 0;
 
 		public var roll_last_rate					:Number = 0;
 		public var roll_servo_out					:Number = 0;
@@ -481,12 +486,10 @@
 		public function Main():void
 		{
 			ahrs					= new AHRS();
-			copter.ahrs				= ahrs;
-
+			apm_rc					= new APM_RC();
 			g_gps					= new GPS(copter.loc);
 			baro					= new Baro(copter.loc);
 			sonar					= new Sonar(copter.loc);
-			apm_rc					= new APM_RC();
 			next_WP					= new Location();
 			current_loc				= new Location();
 			home					= new Location();
@@ -498,6 +501,10 @@
 			roll_rate_d_filter		= new AverageFilter(3);
 			motors					= new Motors();
 			waypoints				= new Array();
+			motor_out				= new Array();
+
+			copter.ahrs				= ahrs;
+			copter.apm_rc			= apm_rc;
 
 			// AP queues
 			command_nav_queue 		= new Location();
@@ -547,7 +554,7 @@
 			m.addItem(new QuickMenuItem("Stabilize P", 			"stab_p"));
 			m.addItem(new QuickMenuItem("Stabilize I", 			"stab_i"));
 
-			m.addItem(new QuickMenuItem("Rate Roll Error", 		"rate_error"));
+			m.addItem(new QuickMenuItem("Rate Roll Error", 		"roll_rate_error"));
 			m.addItem(new QuickMenuItem("Stabilize Rate P", 	"rate_p"));
 			m.addItem(new QuickMenuItem("Stabilize Rate I", 	"rate_i"));
 			m.addItem(new QuickMenuItem("Stabilize Rate D", 	"rate_d"));
@@ -637,8 +644,6 @@
 
 
 			// setup radio
-			//g.rc_1 = rc_roll;
-			//g.rc_3 = rc_throttle;
 			rc_throttle.sticky = true;
 
 			init_sim();
@@ -750,7 +755,7 @@
 
 			// write out the servo PWM values
 			// ------------------------------
-			set_servos();
+			set_servos_4();
 		}
 
 		public function medium_loop():void
@@ -819,7 +824,7 @@
 
 					if(motors.armed){
 						//if (g.log_bitmask & MASK_LOG_ATTITUDE_MED)
-						//	Log_Write_Attitude();
+						Log_Write_Attitude();
 
 						//if (g.log_bitmask & MASK_LOG_MOTORS)
 						//	Log_Write_Motors();
@@ -974,6 +979,7 @@
 						update_simple_mode();
 					}
 
+					//g.rc_1.control_in = constrain(g.rc_1.control_in, -1300, 1300);
 					// in this mode, nav_roll and nav_pitch = the iterm
 					g.rc_1.servo_out = get_stabilize_roll(g.rc_1.control_in);
 					//g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in);
@@ -1361,27 +1367,29 @@
 		public function get_rate_roll(target_rate:Number):Number
 		{
 			var current_rate	:Number = 0;
-			var rate_error		:Number = 0;
+			//roll_rate_error
 			var rate_d			:Number = 0;
 			var output			:Number = 0;
 
 			// get current rate
 			//current_rate 	= (omega.x * DEGX100);
-			current_rate 	= ahrs.omega.x;
+			current_rate 	= (ahrs.omega.x * DEGX100);
 
 			// calculate and filter the acceleration
-			rate_d 			= roll_rate_d_filter.apply(current_rate - roll_last_rate);
+			rate_d 			= -roll_rate_d_filter.apply(current_rate - roll_last_rate);
 
 			// store rate for next iteration
 			roll_last_rate 	= current_rate;
 
 			// call pid controller
-			rate_error		= target_rate - current_rate;
+			roll_rate_error	= target_rate - current_rate;
 
-			p_stab_rate 	= g.pid_rate_roll.get_p(rate_error);
-			i_stab_rate		= 0 //g.pid_rate_roll.get_i(rate_error, G_Dt);
-			d_stab_rate		= 0 //g.pid_rate_roll.get_d(rate_error, G_Dt);
+			p_stab_rate 	= g.pid_rate_roll.get_p(roll_rate_error);
+			i_stab_rate		= g.pid_rate_roll.get_i(roll_rate_error, G_Dt);
+			d_stab_rate		= g.pid_rate_roll.get_d(roll_rate_error, G_Dt);
 			output			= p_stab_rate + i_stab_rate + d_stab_rate;
+
+			//trace(ahrs.roll_sensor, rate_d, current_rate);
 
 			// Dampening output with D term
 			rate_d_dampener = rate_d * roll_scale_d;
@@ -1572,8 +1580,8 @@
 
 			i = constrain(i, 0, g.command_total);
 			//Serial.printf("set_command: %d with id: %d\n", i, temp.id);
-			trace("set_command: "+i+" with id: "+ temp.id);
-			report_wp();
+			//trace("set_command: "+i+" with id: "+ temp.id);
+			//report_wp();
 
 			// store home as 0 altitude!!!
 			// Home is always a MAV_CMD_NAV_WAYPOINT (16)
@@ -1649,7 +1657,7 @@
 			// no need to save this to EPROM
 			set_cmd_with_index(home, 0);
 			trace("init_home")
-			print_wp(home, 0);
+			//print_wp(home, 0);
 
 			// Save prev loc this makes the calcs look better before commands are loaded
 			prev_WP = home.clone();
@@ -2822,32 +2830,87 @@
 			//g.throttle_cruise.save();
 		}
 
-		public function set_servos()
+
+		public function set_servos_4()
 		{
-			if(motors.armed){
-				copter.throttle = g.rc_3.servo_out;
-				//copter.throttle = nav_thrust_z; // g.rc_3.servo_out;
-
-				//var target_rpm:Number;
-
-				// calc each motor mix before RPM.
-
-				motor_pwm			= g.rc_1.servo_out *.1;	// motor_pwm = 0 - 1000;
-				//motor_rpm			= motor_pwm / 8880 * g.motor_kv; // 8880 = 1000 * 11.1 * .8
-				motor_rpm 			= (motor_pwm * g.motor_kv) / 1000;
-
-				//motor_rpm			+= constrain((target_rpm - motor_rpm), -400, 400);
-
-				trace(motor_pwm);
-
-				ahrs.omega.x 		+= motor_rpm * 2.4; 			//rpm_to_thrust; // tune for real life
-				//trace("ahrs.omega.x")
-				ahrs.addToRoll(ahrs.omega.x * G_Dt);
-				//ahrs.roll_sensor 	+= ahrs.omega.x * G_Dt;
-				//ahrs.roll_sensor		= wrap_180(ahrs.roll_sensor);
-			}else{
-				copter.throttle = 0;
+			if (motors.armed == true && motors.auto_armed == true) {
+				// creates the radio_out and pwm_out values
+				output_motors_armed();
+			} else{
+				output_motors_disarmed();
 			}
+		}
+
+		public function output_motors_armed()
+		{
+			var roll_out	:int = 0
+			//var pitch_out	:int = 0
+			var out_min		:int = g.rc_3.radio_min;
+			var out_max 	:int = g.rc_3.radio_max;
+			//trace("out_max", out_max, "out_min", out_min);
+
+			// Throttle is 0 to 1000 only
+			g.rc_3.servo_out 	= constrain(g.rc_3.servo_out, 0, MAXIMUM_THROTTLE);
+
+			if(g.rc_3.servo_out > 0)
+				out_min = g.rc_3.radio_min + MINIMUM_THROTTLE;
+
+			g.rc_1.calc_pwm();
+			//g.rc_2.calc_pwm();
+			g.rc_3.calc_pwm();
+
+			roll_out 	 		= g.rc_1.pwm_out; // 157 pwm
+			//pitch_out 	 	= g.rc_2.pwm_out;
+			// right motor
+			motor_out[MOT_1]	= g.rc_3.radio_out - roll_out;
+			// left motor
+			motor_out[MOT_2]	= g.rc_3.radio_out + roll_out;
+
+
+			// XXX skipping YAW
+
+			/* We need to clip motor output at out_max. When cipping a motors
+			 * output we also need to compensate for the instability by
+			 * lowering the opposite motor by the same proportion. This
+			 * ensures that we retain control when one or more of the motors
+			 * is at its maximum output
+			 */
+			/*for (int i = MOT_1; i <= MOT_4; i++){
+					if(motor_out[i] > out_max){
+						// note that i^1 is the opposite motor
+						motor_out[i ^ 1] -= motor_out[i] - out_max;
+						motor_out[i] = out_max;
+					}
+			}*/
+
+			// XXX do simple implementation
+
+			// limit output so motors don't stop
+			motor_out[MOT_1]	= Math.max(motor_out[MOT_1], 	out_min);
+			motor_out[MOT_2]	= Math.max(motor_out[MOT_2], 	out_min);
+
+			// cut motors
+			if(g.rc_3.servo_out == 0){
+				motor_out[MOT_1]	= g.rc_3.radio_min;
+				motor_out[MOT_2]	= g.rc_3.radio_min;
+			}
+
+			apm_rc.outputCh(MOT_1, motor_out[MOT_1]);
+			apm_rc.outputCh(MOT_2, motor_out[MOT_2]);
+		}
+
+		public function output_motors_disarmed()
+		{
+			if(g.rc_3.control_in > 0){
+				// we have pushed up the throttle
+				// remove safety
+				motors.auto_armed = true;
+			}
+
+			// Send commands to motors
+			apm_rc.outputCh(CH_1, g.rc_3.radio_min);
+			apm_rc.outputCh(CH_2, g.rc_3.radio_min);
+
 		}
 
 		// -----------------------------------------------------------------------------------
@@ -3425,8 +3488,7 @@
 
 		public function init_rc_out():void
 		{
-			// nothing to do here
-
+			g.rc_3.set_range_out(0,1000);
 		}
 
 		public function read_radio():void
@@ -3608,6 +3670,11 @@
 		{
 			//trace("CTUN", 0, copter.position.x, baro_alt, next_WP.alt, nav_throttle, angle_boost, manual_boost, climb_rate, copter.throttle, pid_throttle.get_integrator(), pid_rate_throttle.get_integrator());
 		}
+		private function Log_Write_Attitude():void
+		{
+			//trace("ATT", g.rc_1.control_in, ahrs.roll_sensor);
+		}
+
 
 		// ----------------------------------------
 		// System.pde
@@ -3849,6 +3916,8 @@
 			copter.position.x 	= g.start_position_BI.getNumber();
 			copter.position.z 	= g.start_height_BI.getNumber(); // add in some delay
 			baro.enable_noise	= g.baro_noise_checkbox.getSelected();
+			fastPlot			= g.fastPlot_checkbox.getSelected();
+
 
 			copter.loc.lng 		= copter.position.x;
 			copter.loc.alt 		= copter.position.z;
@@ -3865,7 +3934,9 @@
 			ahrs.init();
 			g_gps.init();
 			copter.roll_target 	= nav_lon = 0;
-			copter.rotation 	= ahrs.roll_sensor = 0;
+			ahrs.roll_sensor	= g.start_angle_BI.getNumber();
+			trace("ahrs.roll_sensor")
+			copter.rotation 	= ahrs.roll_sensor;
 
 			// Copter state
 			failsafe 			= false;
@@ -4010,6 +4081,11 @@
 			}
 
 			switch(k.keyCode){
+
+				case 84:  // 1 for
+					test_radio_rage_output();
+					break;
+
 				case Keyboard.SPACE:
 					gainsHandler(null);
 					break;
@@ -4109,16 +4185,16 @@
 			{
 				// stabilze
 				case "roll_sensor":
-					val = ahrs.roll_sensor/100;
+					val = ahrs.roll_sensor;
 				break;
 				case "control_roll":
-					val = control_roll/100;
+					val = control_roll;
 				break;
 
 
 
 				case "roll_error":
-					val = (control_roll - ahrs.roll_sensor)/100;
+					val = (control_roll - ahrs.roll_sensor);
 				break;
 
 				case "stab_p":
@@ -4129,8 +4205,8 @@
 				break;
 
 
-				case "rate_error":
-					val = rate_error;
+				case "roll_rate_error": // roll rate error
+					val = roll_rate_error;
 				break;
 				case "rate_p":
 					val = p_stab_rate;
@@ -4275,6 +4351,45 @@
 		// -----------------------------------------------------------------------------------
 		// Utility functions
 		//------------------------------------------------------------------------------------
+
+		public function test_radio_rage_input(index:int = 255)
+		{
+			ch_6_pwm = 990;
+			g.rc_6.set_dead_zone(60);
+			g.rc_6.set_range(1000,2000);
+			trace("----------------------------")
+			trace(g.rc_6._high_in, g.rc_6._high_in);
+			trace("----------------------------")
+
+			for (var i:int = 0; i < 1020; i++){
+				apm_rc.set_PWM_channel(ch_6_pwm, CH_6);
+				g.rc_6.set_pwm(apm_rc.InputCh(CH_6));
+				ch_6_pwm++;
+				trace(g.rc_6.radio_in, g.rc_6.control_in);
+			}
+		}
+
+		public function test_radio_rage_output(index:int = 255)
+		{
+			g.rc_3.set_range(MINIMUM_THROTTLE, MAXIMUM_THROTTLE);
+			g.rc_3.set_range_out(0, 1000);
+			g.rc_3.set_dead_zone(60);
+			var s_out:int = 0;
+
+			trace("----------------------------")
+			trace(g.rc_3._high_out, g.rc_3._low_out);
+			trace("----------------------------")
+
+			for (s_out = 0; s_out < 1000; s_out++){
+				//apm_rc.set_PWM_channel(ch_3_pwm, CH_3);
+				//g.rc_3.set_pwm(apm_rc.InputCh(CH_3));
+
+				g.rc_3.servo_out = s_out;
+				g.rc_3.calc_pwm();
+				trace("servo_out:", s_out, Math.floor(g.rc_3.pwm_out), Math.floor(g.rc_3.radio_out));
+			}
+		}
+
 		public function report_wp(index:int = 255)
 		{
 			var temp:Location;
