@@ -175,7 +175,7 @@ package com {
 		private var stab_d					:Number = 0.0;
 
 		public var stabilize_d_schedule		:Number = .5;
-		public var stabilize_d				:Number = .15;
+		public var stabilize_d				:Number = .45;
 
 		// -----------------------------------------
 		// Acro
