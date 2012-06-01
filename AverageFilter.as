@@ -4,15 +4,16 @@ package com {
 		public var samples:Array;
 		public var filter_size:int = 0;
 		public var sample_index:int = 0;
+		public var first_use:Boolean = true;
 
 		public function AverageFilter(_size:int = 4){
 			samples = new Array(_size);
 			filter_size = _size;
+
 			// init
 			for (var i:int = 0; i < _size; i++){
 				samples[i] = 0;
 			}
-
 		}
 
 		public function force_sample(_sample:Number):void
@@ -26,6 +27,11 @@ package com {
 		{
 			if(filter_size <= 1)
 				return _sample;
+
+			if(first_use){
+				force_sample(_sample);
+				first_use = false;
+			}
 
 			samples[sample_index] = _sample;
 			sample_index++;
