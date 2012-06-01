@@ -23,17 +23,18 @@
 	import com.Wind;
 	import com.AHRS;
 	import com.Parameters;
-
+	import com.APM_RC;
 
 	public class Copter extends MovieClip
 	{
 		public var ahrs						:AHRS;
 		public var loc						:Location;
 		public var g						:Parameters;
+		public var apm_rc					:APM_RC;
 
 		public var speed					:int = 0;
 		public var gravity					:Number = 981;
-		public var thrust					:Number = 0.4;
+		public var thrust_scale				:Number = 0.4;
 		//public var friction					:Number = .0010; // affects aplitude of oscillations
 		public var mass						:Number = 1;
 		public var ground_speed				:Number = 0;
@@ -75,26 +76,71 @@
 			g = Parameters.getInstance();
 		}
 
-
 		public function setThrottleCruise(c:Number):void
 		{
-			thrust = gravity / c;
+			// c = 0 : 1000
+			//thrust_scale = gravity / c;
+			thrust_scale = (mass * gravity) / (2 * c);
+			trace("thrust_scale ",thrust_scale, c);
+			// thrust_scale  0.981 500
 		}
 
 		public function update(dt:Number):void
 		{
+			var thrust	:Number = 0;
+			var rot_accel:Vector3D	= new Vector3D(0,0,0);
+
 			wind.x = windGenerator.read();
 
 			// calc Drag
 			drag.x = .5 * g.airDensity * (airspeed.x * airspeed.x) * g.dragCE * g.crossSection;
 			drag.z = .5 * g.airDensity * (airspeed.z * airspeed.z) * g.dragCE * g.crossSection;
 
-			var _accel_:Number 	= (throttle * thrust)/mass;
+			// radians/s/s
+			/*
+			rot_accel.x  -= g.motor_kv * .33 * apm_rc.get_motor_output(0);
+			rot_accel.x  += g.motor_kv * .33 * apm_rc.get_motor_output(1);
 
-			accel.x 	= Math.sin(radiansx100(ahrs.roll_sensor)) * _accel_;
-			accel.z 	= Math.cos(radiansx100(ahrs.roll_sensor)) * _accel_;
+			ahrs.omega.x += rot_accel.x * dt;
+			ahrs.addToRoll(ahrs.omega.x * dt);
+			*/
+
+			rot_accel.x  -= g.motor_kv * .33 * apm_rc.get_motor_output(0);
+			rot_accel.x  += g.motor_kv * .33 * apm_rc.get_motor_output(1);
+
+			//trace(rot_accel.x);
+
+			ahrs.roll_speed.x	+= rot_accel.x * dt;
+			ahrs.roll_sensor	+= ahrs.roll_speed.x * dt;
+			ahrs.roll_sensor	= wrap_180(ahrs.roll_sensor);
+
+			ahrs.omega.x = radiansx100(ahrs.roll_speed.x);
+
+			//trace(ahrs.omega.x);
+
+			//roll_sensor = wrap_180(roll_sensor);
+
+			// calc thrust
+			//get_motor_output returns 0 : 1000
+			thrust += apm_rc.get_motor_output(0) * thrust_scale;
+			thrust += apm_rc.get_motor_output(1) * thrust_scale;
+
+			//1667.7 850 850 0.981
+
+			//trace(thrust, apm_rc.get_motor_output(0), apm_rc.get_motor_output(1), thrust_scale)
+			//trace(apm_rc.get_motor_output(0))
+
+			//rotaional drag
+			//rot_accel.x -= ahrs.omega.x;
+
+
+			//var _accel_:Number 	= (thrust * thrust_scale);
+
+
+			accel.x 	= Math.sin(radiansx100(ahrs.roll_sensor)) * thrust;
+			accel.z 	= Math.cos(radiansx100(ahrs.roll_sensor)) * thrust;
+			//trace(thrust, accel.z, gravity);
 			accel.z 	-= gravity;
-
 
 			if(airspeed.x >= 0)
 				accel.x 	-= drag.x;
@@ -156,9 +202,17 @@
 			return 0.000174532925 * n;
 		}
 
-		public function degrees(radians:Number):Number
+		public function degreesx100(r:Number):Number
 		{
-			return radians * 180/Math.PI
+			return r * 5729.57795;
+		}
+		public function degrees(r:Number):Number
+		{
+			return r * 57.2957795;
+		}
+		public function radians(n:Number):Number
+		{
+			return 0.0174532925 * n;
 		}
 
 	}
