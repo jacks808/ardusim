@@ -63,10 +63,9 @@
         	// store current copter loc into the Delay Array
 			delay_array[pointer].alt = _copter_loc.alt;
 
-			var old_pointer = (pointer + 1) % max_delay;
-			var cur_pointer = (pointer + 2) % max_delay;
+			var old_pointer:int = (pointer + 1) % max_delay;
 
-			altitude  = delay_array[cur_pointer].alt;
+			altitude  = delay_array[old_pointer].alt;
 			index++;
 			if (index >= l)
 				index = 0;
