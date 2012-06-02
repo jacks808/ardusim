@@ -38,13 +38,23 @@ package com {
 		public var windSpeedMax				:Number = 100;
 		public var windPeriod				:Number = 30000;
 		public var airDensity				:Number = 1.184;
-		public var crossSection				:Number = 0.0325;  // 3.3° at 1m/s wind , 7° at 1.5m/s wind, 12° at 2m/s wind 22° at 2.5m/s wind
-		public var dragCE					:Number = 0.25;
+		//public var crossSection				:Number = 0.0325;  // 3.3° at 1m/s wind , 7° at 1.5m/s wind, 12° at 2m/s wind 22° at 2.5m/s wind
+		public var crossSection				:Number = 0.015;
+		public var dragCE					:Number = 0.20;
 		public var speed_filter_size		:Number = 2;
 		public var motor_kv					:Number = 1000;
+		public var moment					:Number = 3;
+		public var mass						:Number = 500;
+		public var esc_delay				:int = 8;
+
 
 		public var motor_kv_BI				:BasicInput;
 		public var wind_high_BI				:BasicInput;
+		public var moment_BI				:BasicInput;
+		public var mass_BI					:BasicInput;
+		public var esc_delay_BI				:BasicInput;
+
+
 
 		// -----------------------------------------
 		// SIM
@@ -216,7 +226,7 @@ package com {
 		private var nav_d					:Number = 0.00;
 		private var nav_imax				:Number = 3000;
 		public var rtl_approach_alt			:int = 100;
-		public var rtl_land_enabled			:Boolean = false;
+		public var rtl_land_enabled			:Boolean = true;
 		public var auto_slew_rate			:Number = 30;
 		public var RTL_altitude				:int = 0; // ALT_HOLD_HOME  height to return to Home, 0 = Maintain current altitude
 
@@ -228,7 +238,7 @@ package com {
 		public var loiter_radius			:int = 10;
 		public var waypoint_speed_max		:Number = 600;
 		public var crosstrack_gain			:int = 1;
-		public var auto_land_timeout		:Number = 10000;// milliseconds
+		public var auto_land_timeout		:Number = 5000;// milliseconds
 
 		public var ch7_option				:int = 7; //CH7_SAVE_WP
 
@@ -350,6 +360,9 @@ package com {
 			start_angle_BI.setNumber(0);
 
 			motor_kv_BI.setNumber(motor_kv);
+			moment_BI.setNumber(moment);
+			mass_BI.setNumber(mass);
+			esc_delay_BI.setNumber(esc_delay);
 
 		}
 
@@ -404,6 +417,12 @@ package com {
 			speed_filter_size			= speed_filter_BI.getNumber();
 
 			motor_kv					= motor_kv_BI.getNumber();
+			moment						= moment_BI.getNumber();
+			mass						= mass_BI.getNumber();
+			esc_delay					= esc_delay_BI.getNumber();
+
+			if(moment == 0) moment = 1;
+			if(mass == 0) mass = 1;
 		}
 
 
