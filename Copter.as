@@ -36,7 +36,6 @@
 		public var gravity					:Number = 981;
 		public var thrust_scale				:Number = 0.4;
 		//public var friction					:Number = .0010; // affects aplitude of oscillations
-		public var mass						:Number = 1;
 		public var ground_speed				:Number = 0;
 		public var roll_target				:Number	= 0;
 		public var throttle					:Number	= 500;
@@ -52,6 +51,9 @@
 		public var rot_accel				:Vector3D;			//
 		public var angle_boost				:Number;
 		public var windGenerator			:Wind;			//
+		public var delay_filter				:Array;			// applies delayed rotational accel
+		public var pointer					:int = 0;			// applies delayed rotational accel
+		//public var max_delay				:int = 10;			// applies delayed rotational accel
 
 
 		public function Copter():void
@@ -68,21 +70,28 @@
 			rot_accel	= new Vector3D(0,0,0);
 
 			windGenerator = new Wind();
+			g = Parameters.getInstance();
 			setThrottleCruise(throttle);
+
+
 	    }
 
 	    public function addedToStage(even:Event) : void
 		{
-			g = Parameters.getInstance();
+			//g = Parameters.getInstance();
 		}
 
 		public function setThrottleCruise(c:Number):void
 		{
 			// c = 0 : 1000
 			//thrust_scale = gravity / c;
-			thrust_scale = (mass * gravity) / (2 * c);
-			trace("thrust_scale ",thrust_scale, c);
+			thrust_scale = (g.mass * gravity) / (2 * c);
+			//trace("thrust_scale ",thrust_scale, c);
 			// thrust_scale  0.981 500
+
+			delay_filter = new Array(g.esc_delay);
+			for(var i:int = 0; i < g.esc_delay;i++)
+				delay_filter[i] = 0;
 		}
 
 		public function update(dt:Number):void
@@ -105,10 +114,21 @@
 			ahrs.addToRoll(ahrs.omega.x * dt);
 			*/
 
-			rot_accel.x  -= g.motor_kv * .33 * apm_rc.get_motor_output(0);
-			rot_accel.x  += g.motor_kv * .33 * apm_rc.get_motor_output(1);
+			rot_accel.x  -= g.motor_kv  * apm_rc.get_motor_output(0);
+			rot_accel.x  += g.motor_kv  * apm_rc.get_motor_output(1);
 
-			//trace(rot_accel.x);
+			rot_accel.x /= g.moment;
+
+        	pointer++;
+        	if (pointer >= g.esc_delay)
+        		pointer = 0;
+
+			// store current request
+			delay_filter[pointer] = rot_accel.x;
+
+			// index to old request
+			var old_pointer:int = (pointer + 1) % g.esc_delay;
+			rot_accel.x = delay_filter[old_pointer];
 
 			ahrs.roll_speed.x	+= rot_accel.x * dt;
 			ahrs.roll_sensor	+= ahrs.roll_speed.x * dt;
@@ -120,6 +140,8 @@
 			//get_motor_output returns 0 : 1000
 			thrust += apm_rc.get_motor_output(0) * thrust_scale;
 			thrust += apm_rc.get_motor_output(1) * thrust_scale;
+
+			thrust  /= g.mass;
 
 			//rotaional drag
 			//rot_accel.x -= ahrs.omega.x;
