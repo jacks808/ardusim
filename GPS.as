@@ -97,7 +97,7 @@ package com {
 
 			*/
 			var old_pointer = (pointer + 1) % max_delay;
-			var cur_pointer = (pointer + 2) % max_delay;
+			//var cur_pointer = (pointer + 2) % max_delay;
 			//trace("pointer ",pointer, old_pointer, cur_pointer );
 
             //var p1 = new Point(delay_array[cur_pointer].lng, delay_array[cur_pointer].lat);
@@ -110,9 +110,9 @@ package com {
             new_data = true;
 
 			// grab the loc out of the delay array
-			longitude = delay_array[cur_pointer].lng;
-			latitude  = delay_array[cur_pointer].lat;
-			altitude  = delay_array[cur_pointer].alt;
+			longitude = delay_array[old_pointer].lng;
+			latitude  = delay_array[old_pointer].lat;
+			altitude  = delay_array[old_pointer].alt;
         }
 
 		public function fixrez(n:Number):Number
