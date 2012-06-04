@@ -44,7 +44,7 @@ package com {
 		public var motor_kv					:Number 	= 1000;
 		public var moment					:Number 	= 3;
 		public var mass						:Number 	= 500;
-		public var esc_delay				:int 		= 8;
+		public var esc_delay				:int 		= 12;
 
 		// -----------------------------------------
 		// SIM
@@ -122,6 +122,7 @@ package com {
 		public var alt_rate_D_BI			:BasicInput;
 		public var throttle_error_BI		:BasicInput;
 
+		public var alt_D_BI					:BasicInput;
 
 		// -----------------------------------------
 		// Sensors
@@ -168,6 +169,7 @@ package com {
 		private var throttle_rate_i			:Number = 0.0;
 		private var throttle_rate_d			:Number = 0.02;
 		private var throttle_rate_imax		:Number = 300;
+		public var alt_D					:Number = 15;
 
 
 		// -----------------------------------------
@@ -361,7 +363,7 @@ package com {
 			alt_rate_Imax_BI.setNumber(throttle_rate_imax);
 			alt_rate_D_BI.setNumber(throttle_rate_d);
 			throttle_error_BI.setNumber(throttle_cruise_e);
-
+			alt_D_BI.setNumber(alt_D);
 
 			// SIM
 			drag_BI.setNumber(dragCE);
@@ -433,6 +435,8 @@ package com {
 			pid_throttle._imax 			= alt_rate_Imax_BI.getNumber();
 			pid_throttle._kd 			= alt_rate_D_BI.getNumber();
 			throttle_cruise_e 			= throttle_error_BI.getNumber();
+
+			alt_D 						= alt_D_BI.getNumber();
 
 			// SIM
 			dragCE						= drag_BI.getNumber();
