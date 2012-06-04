@@ -72,6 +72,12 @@
 				return null;
 		}
 
+		public function setSelectedItemByName(s:String)
+		{
+			menu.setSelectedItemByName(s);
+			setLabel(menu.getSelectedItem()._label);
+		}
+
 		public function getSelectedIndex():Number
 		{
 			return menu.current_index;

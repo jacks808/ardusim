@@ -11,9 +11,9 @@ package com {
 
 	public class QuickMenu extends MovieClip
 	{
-		private var EVENT_NAME:String = "QuickMenu";
-		public var menu:QuickMenu;
-		public var frame:Rectangle;
+		private var EVENT_NAME		:String = "QuickMenu";
+		public var menu				:QuickMenu;
+		public var frame			:Rectangle;
 
 		//private var item_height:int = 18;
 		private var items:Array;
@@ -97,6 +97,15 @@ package com {
 				n = 0;
 
 			current_index = n;
+		}
+
+		public function setSelectedItemByName(s:String)
+		{
+			for(var i:int=1; i <items.length; i++){
+				if (items[i].getLabel() == s){
+					setSelectedIndex(items[i].index);
+				}
+			}
 		}
 
 		public function hasItems():Boolean

@@ -41,6 +41,12 @@ package com {
 			return _selected;
 		}
 
+		public function setSelected(s:Boolean):void
+		{
+			_selected = s;
+			draw();
+		}
+
 		public function setEnabled():void
 		{
 			addEventListener(MouseEvent.MOUSE_DOWN, mouseDownHandler);

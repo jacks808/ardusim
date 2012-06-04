@@ -14,9 +14,9 @@ package com {
 		//public var EVENT_NAME:String = "CLICK";
 		private var isEnabled:Boolean = true;
 
-		public var _label:String;
-		private var _code:String;
-		public var index:int;
+		public var _label		:String;
+		private var _code		:String;
+		public var index		:int;
 		public var frame:Rectangle;
 		public var menu:QuickMenu;
 		public var item_height:int = 18;

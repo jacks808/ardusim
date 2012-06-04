@@ -25,6 +25,11 @@ package com {
 			draw();
 		}
 
+		public function getLabel():String
+		{
+			return "div";
+		}
+
 		public function draw(){
 			graphics.clear();
 			graphics.lineStyle(1, 0xCCCCCC);
