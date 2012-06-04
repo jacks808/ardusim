@@ -33,32 +33,27 @@ package com {
 		// ---------------------------------------------
 		// Sim Details controls
 		// ---------------------------------------------
-		public var sim_iterations			:int = 5000;
-		public var windSpeedMin				:Number = 25;
-		public var windSpeedMax				:Number = 100;
-		public var windPeriod				:Number = 30000;
-		public var airDensity				:Number = 1.184;
-		//public var crossSection				:Number = 0.0325;  // 3.3° at 1m/s wind , 7° at 1.5m/s wind, 12° at 2m/s wind 22° at 2.5m/s wind
-		public var crossSection				:Number = 0.015;
-		public var dragCE					:Number = 0.20;
-		public var speed_filter_size		:Number = 2;
-		public var motor_kv					:Number = 1000;
-		public var moment					:Number = 3;
-		public var mass						:Number = 500;
-		public var esc_delay				:int = 8;
+		public var sim_iterations			:int 		= 5000;
+		public var windSpeedMin				:Number 	= 25;
+		public var windSpeedMax				:Number 	= 100;
+		public var windPeriod				:Number 	= 30000;
+		public var airDensity				:Number 	= 1.184;
+		public var crossSection				:Number 	= 0.015;
+		public var dragCE					:Number 	= 0.20;
+		public var speed_filter_size		:Number 	= 2;
+		public var motor_kv					:Number 	= 1000;
+		public var moment					:Number 	= 3;
+		public var mass						:Number 	= 500;
+		public var esc_delay				:int 		= 8;
 
-
+		// -----------------------------------------
+		// SIM
+		// -----------------------------------------
 		public var motor_kv_BI				:BasicInput;
 		public var wind_high_BI				:BasicInput;
 		public var moment_BI				:BasicInput;
 		public var mass_BI					:BasicInput;
 		public var esc_delay_BI				:BasicInput;
-
-
-
-		// -----------------------------------------
-		// SIM
-		// -----------------------------------------
 		public var drag_BI					:BasicInput;
 		public var crossSection_BI			:BasicInput;
 		public var airDensity_BI			:BasicInput;
@@ -71,42 +66,21 @@ package com {
 		public var start_speed_BI			:BasicInput;
 		public var start_position_BI		:BasicInput;
 		public var start_height_BI			:BasicInput;
-
 		public var target_distance_BI		:BasicInput;
 		public var target_altitude_BI		:BasicInput;
-
 		public var wind_low_BI				:BasicInput;
 		public var wind_period_BI			:BasicInput;
+
 		public var wind_checkbox			:QuickCheckBox;
-		public var gps_checkbox				:QuickCheckBox;	// for Ryan's estimator
-		public var fastPlot_checkbox		:QuickCheckBox;	// for Ryan's estimator
+		public var gps_checkbox				:QuickCheckBox;
+		public var fastPlot_checkbox		:QuickCheckBox;
+		public var axis_enabled_checkbox	:QuickCheckBox;
+		public var sonar_checkbox			:QuickCheckBox;
+		public var rtl_land_checkbox		:QuickCheckBox;
 
-
-		// Logging
-		public var NTUN_checkbox				:QuickCheckBox;	// for Ryan's estimator
-		public var CTUN_checkbox				:QuickCheckBox;	// for Ryan's estimator
-		//public var gps_checkbox				:QuickCheckBox;	// for Ryan's estimator
-
-
-		// -----------------------------------------
-		// Sensors
-		// -----------------------------------------
-		public var sonar_enabled			:Boolean = false;
-
-		// ---------------------------------------------
-		// Throttle
-		// ---------------------------------------------
-		public var throttle_min				:int = 0
-		public var throttle_max				:int = 1000
-		public var throttle_fs_enabled		:Boolean = true;
-		public var throttle_fs_action		:int = 2
-		public var throttle_fs_value		:int = 975
-		public var throttle_cruise			:Number = 500;
-		public var throttle_cruise_e		:Number = 0;
-
-		// ---------------------------------------------
-		// GUI controls
-		// ---------------------------------------------
+		public var NTUN_checkbox			:QuickCheckBox;
+		public var CTUN_checkbox			:QuickCheckBox;
+		//public var gps_checkbox			:QuickCheckBox;
 
 		// stability
 		public var stab_roll_P_BI			:BasicInput;
@@ -149,24 +123,20 @@ package com {
 		public var throttle_error_BI		:BasicInput;
 
 
-		// ---------------------------------------------
-		// Radio
-		// ---------------------------------------------
-		public var rc_1						:RC_Channel;
-		public var rc_2						:RC_Channel;
-		public var rc_3						:RC_Channel;
-		public var rc_4						:RC_Channel;
-		public var rc_5						:RC_Channel;
-		public var rc_6						:RC_Channel;
-		public var rc_7						:RC_Channel;
-		public var rc_8						:RC_Channel;
+		// -----------------------------------------
+		// Sensors
+		// -----------------------------------------
+		public var sonar_enabled			:Boolean = false;
 
+		// ---------------------------------------------
+		// LEDS
+		// ---------------------------------------------
+		public var copter_leds_mode			:int = 9;
 
 		// ---------------------------------------------
 		// Acro
 		// ---------------------------------------------
 		public var axis_enabled				:Boolean = false;
-		public var axis_lock_p				:Number = .02;
 
 
 		// -----------------------------------------
@@ -178,19 +148,13 @@ package com {
 		private var stabilize_i				:Number = 0.1;
 		private var stabilize_imax			:Number = 4000;
 
-		private var rate_p					:Number = 0.14;
+		private var rate_p					:Number = 0.17; // .14
 		private var rate_i					:Number = 0.0;
-		private var rate_d					:Number = 0.0;
+		private var rate_d					:Number = 0.004;  // .002
 		private var rate_imax				:Number = 500;
 		private var stab_d					:Number = 0.0;
 
-		public var stabilize_d_schedule		:Number = .5;
-		public var stabilize_d				:Number = .45;
-
-		// -----------------------------------------
-		// Acro
-		// -----------------------------------------
-		public var acro_p					:Number = 9.5; // 4.5 default
+		public var super_simple				:Boolean = false;
 
 		// -----------------------------------------
 		// Altitude hold
@@ -227,20 +191,67 @@ package com {
 		private var nav_imax				:Number = 3000;
 		public var rtl_approach_alt			:int = 100;
 		public var rtl_land_enabled			:Boolean = true;
-		public var auto_slew_rate			:Number = 30;
 		public var RTL_altitude				:int = 0; // ALT_HOLD_HOME  height to return to Home, 0 = Maintain current altitude
 
 
+		// Waypoints
+		//
 		public var command_total			:int = 0;
 		public var command_index			:int = 0;
 		public var command_nav_index		:int = 0;
 		public var waypoint_radius			:int = 100;
 		public var loiter_radius			:int = 10;
 		public var waypoint_speed_max		:Number = 600;
-		public var crosstrack_gain			:int = 1;
+		public var crosstrack_gain			:Number = 1.0;
 		public var auto_land_timeout		:Number = 5000;// milliseconds
 
-		public var ch7_option				:int = 7; //CH7_SAVE_WP
+		// Throttle
+		//
+		public var throttle_min				:int 		= 0
+		public var throttle_max				:int 		= 1000
+		public var throttle_fs_enabled		:Boolean 	= true;
+		public var throttle_fs_action		:int 		= 2
+		public var throttle_fs_value		:int 		= 975
+		public var throttle_cruise			:Number 	= 500;
+		public var throttle_cruise_e		:Number 	= 0;
+
+
+		// Flight modes
+		//
+		public var flight_mode1				:int 		= 0; // STABILIZE
+		public var flight_mode2				:int 		= 0;
+		public var flight_mode3				:int 		= 0;
+		public var flight_mode4				:int 		= 0;
+		public var flight_mode5				:int 		= 0;
+		public var flight_mode6				:int 		= 0;
+		public var simple_modes				:int 		= 0;
+
+		// Misc
+		//
+		public var ch7_option				:int		= 7; // CH7_SAVE_WP
+		public var auto_slew_rate			:Number = 30;
+
+		// RC channels
+		public var rc_1						:RC_Channel;
+		public var rc_2						:RC_Channel;
+		public var rc_3						:RC_Channel;
+		public var rc_4						:RC_Channel;
+		public var rc_5						:RC_Channel;
+		public var rc_6						:RC_Channel;
+		public var rc_7						:RC_Channel;
+		public var rc_8						:RC_Channel;
+
+		public var rc_camera_pitch			:RC_Channel;
+		public var rc_camera_roll			:RC_Channel;
+
+		public var camera_pitch_gain		:Number = 1.0;
+		public var camera_roll_gain			:Number = 1.0;
+		public var stabilize_d_schedule		:Number = .5;
+		public var stabilize_d				:Number = 0;
+
+		public var acro_p					:Number = 9.5; // 4.5 default
+		public var axis_lock_p				:Number = .02;
+
 
 		public function Parameters():void
 		{
@@ -293,6 +304,12 @@ package com {
 			fastPlot_checkbox.setLabel("Fast plot");
 
 			baro_noise_checkbox.setLabel("Baro Noise");
+			axis_enabled_checkbox.setLabel("Axis Lock");
+			rtl_land_checkbox.setLabel("RTL Land Enabled");
+			sonar_checkbox.setLabel("Sonar Enabled");
+
+			NTUN_checkbox.setLabel("Log NTUN");
+			CTUN_checkbox.setLabel("Log CTUN");
 
 			initGains();
 		}
@@ -314,6 +331,10 @@ package com {
 
 			// Acro P
 			acro_P_BI.setNumber(acro_p);
+			axis_enabled_checkbox.setSelected(axis_enabled);
+			sonar_checkbox.setSelected(sonar_enabled);
+			rtl_land_checkbox.setSelected(rtl_land_enabled);
+
 
 			// loiter
 			loiter_hold_P_BI.setNumber(loiter_p);
@@ -383,6 +404,9 @@ package com {
 
 			// acro
 			acro_p						= acro_P_BI.getNumber();
+			axis_enabled				= axis_enabled_checkbox.getSelected();
+			sonar_enabled				= sonar_checkbox.getSelected();
+			rtl_land_enabled			= rtl_land_checkbox.getSelected();
 
 
 			// loiter
@@ -424,8 +448,6 @@ package com {
 			if(moment == 0) moment = 1;
 			if(mass == 0) mass = 1;
 		}
-
-
 
 	}
 }
