@@ -32,7 +32,7 @@
 		public var g						:Parameters;
 		public var apm_rc					:APM_RC;
 
-		public var speed					:int = 0;
+		//public var speed					:int = 0;
 		public var gravity					:Number = 981;
 		public var thrust_scale				:Number = 0.4;
 		//public var friction					:Number = .0010; // affects aplitude of oscillations
