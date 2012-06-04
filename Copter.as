@@ -24,6 +24,7 @@
 	import com.AHRS;
 	import com.Parameters;
 	import com.APM_RC;
+	import com.AverageFilter;
 
 	public class Copter extends MovieClip
 	{
@@ -31,6 +32,8 @@
 		public var loc						:Location;
 		public var g						:Parameters;
 		public var apm_rc					:APM_RC;
+		public var motor_filter_1			:AverageFilter;
+		public var motor_filter_0			:AverageFilter;
 
 		//public var speed					:int = 0;
 		public var gravity					:Number = 981;
@@ -44,16 +47,14 @@
 
 		public var drag						:Vector3D;		//
 		public var airspeed					:Vector3D;		//
-		public var accel					:Vector3D;		//
+		public var thrust					:Vector3D;		//
 		public var position					:Vector3D;		//
 		public var velocity					:Vector3D;
+		public var velocity_old				:Vector3D;
 		public var wind						:Vector3D;			//
-		public var rot_accel				:Vector3D;			//
+		public var rot_thrust				:Vector3D;			//
 		public var angle_boost				:Number;
 		public var windGenerator			:Wind;			//
-		public var delay_filter				:Array;			// applies delayed rotational accel
-		public var pointer					:int = 0;			// applies delayed rotational accel
-		//public var max_delay				:int = 10;			// applies delayed rotational accel
 
 
 		public function Copter():void
@@ -63,12 +64,12 @@
 
 			drag 		= new Vector3D(0,0,0);
 			airspeed 	= new Vector3D(0,0,0);
-			accel 		= new Vector3D(0,0,0);
+			thrust 		= new Vector3D(0,0,0);
 			wind 		= new Vector3D(0,0,0);
 			position 	= new Vector3D(0,0,0);
 			velocity 	= new Vector3D(0,0,0);
-			rot_accel	= new Vector3D(0,0,0);
-
+			rot_thrust	= new Vector3D(0,0,0);
+			velocity_old = new Vector3D(0,0,0);
 			windGenerator = new Wind();
 			g = Parameters.getInstance();
 			setThrottleCruise(throttle);
@@ -89,15 +90,14 @@
 			//trace("thrust_scale ",thrust_scale, c);
 			// thrust_scale  0.981 500
 
-			delay_filter = new Array(g.esc_delay);
-			for(var i:int = 0; i < g.esc_delay;i++)
-				delay_filter[i] = 0;
+			motor_filter_0	= new AverageFilter(g.esc_delay);
+			motor_filter_1	= new AverageFilter(g.esc_delay);
 		}
 
 		public function update(dt:Number):void
 		{
-			var thrust	:Number = 0;
-			var rot_accel:Vector3D	= new Vector3D(0,0,0);
+			var _thrust	:Number = 0;
+			var rot_thrust:Vector3D	= new Vector3D(0,0,0);
 
 			wind.x = windGenerator.read();
 
@@ -105,72 +105,57 @@
 			drag.x = .5 * g.airDensity * (airspeed.x * airspeed.x) * g.dragCE * g.crossSection;
 			drag.z = .5 * g.airDensity * (airspeed.z * airspeed.z) * g.dragCE * g.crossSection;
 
-			// radians/s/s
-			/*
-			rot_accel.x  -= g.motor_kv * .33 * apm_rc.get_motor_output(0);
-			rot_accel.x  += g.motor_kv * .33 * apm_rc.get_motor_output(1);
+			// ESC's moving average filter
+			var motor_output_0:Number = motor_filter_0.apply(apm_rc.get_motor_output(0));
+			var motor_output_1:Number = motor_filter_1.apply(apm_rc.get_motor_output(1));
 
-			ahrs.omega.x += rot_accel.x * dt;
-			ahrs.addToRoll(ahrs.omega.x * dt);
-			*/
 
-			rot_accel.x  -= g.motor_kv  * apm_rc.get_motor_output(0);
-			rot_accel.x  += g.motor_kv  * apm_rc.get_motor_output(1);
+			rot_thrust.x 		-= g.motor_kv  * motor_output_0;
+			rot_thrust.x  		+= g.motor_kv  * motor_output_1;
+			rot_thrust.x 		/= g.moment;
 
-			rot_accel.x /= g.moment;
-
-        	pointer++;
-        	if (pointer >= g.esc_delay)
-        		pointer = 0;
-
-			// store current request
-			delay_filter[pointer] = rot_accel.x;
-
-			// index to old request
-			var old_pointer:int = (pointer + 1) % g.esc_delay;
-			rot_accel.x = delay_filter[old_pointer];
-
-			ahrs.roll_speed.x	+= rot_accel.x * dt;
+			ahrs.roll_speed.x	+= rot_thrust.x * dt;
 			ahrs.roll_sensor	+= ahrs.roll_speed.x * dt;
 			ahrs.roll_sensor	= wrap_180(ahrs.roll_sensor);
-
-			ahrs.omega.x = radiansx100(ahrs.roll_speed.x);
+			ahrs.omega.x 		= radiansx100(ahrs.roll_speed.x);
 
 			// calc thrust
 			//get_motor_output returns 0 : 1000
-			thrust += apm_rc.get_motor_output(0) * thrust_scale;
-			thrust += apm_rc.get_motor_output(1) * thrust_scale;
-
-			thrust  /= g.mass;
+			_thrust += motor_output_0 * thrust_scale;
+			_thrust += motor_output_1 * thrust_scale;
 
 			//rotaional drag
-			//rot_accel.x -= ahrs.omega.x;
+			//rot_thrust.x -= ahrs.omega.x;
 
-			accel.x 	= Math.sin(radiansx100(ahrs.roll_sensor)) * thrust;
-			accel.z 	= Math.cos(radiansx100(ahrs.roll_sensor)) * thrust;
-			//trace(thrust, accel.z, gravity);
-			accel.z 	-= gravity;
+			thrust.x 	= Math.sin(radiansx100(ahrs.roll_sensor)) * _thrust;
+			thrust.z 	= Math.cos(radiansx100(ahrs.roll_sensor)) * _thrust;
 
+			// Add in Drag
 			if(airspeed.x >= 0)
-				accel.x 	-= drag.x;
+				velocity.x 	-= drag.x * dt;
 			else
-				accel.x 	+= drag.x;
+				velocity.x 	+= drag.x * dt;
 
 			if(airspeed.z >= 0)
-				accel.z 	-= drag.z;
+				velocity.z 	-= drag.z * dt;
 			else
-				accel.z 	+= drag.z;
+				velocity.z 	+= drag.z * dt;
 
-			//accel.z  = 2;
-			//trace("accel.z ",accel.z);
-			//trace(accel.x);
+			velocity.x 		+= (thrust.x * dt) / g.mass;
+			velocity.z  	+= (thrust.z * dt) / g.mass;
+			velocity.z 		-= gravity * dt;
 
-			velocity.x 	+= accel.x * dt;
-			velocity.z  += accel.z * dt;
+			ahrs.accel.x 	= (velocity.x - velocity_old.x) / (dt * 100);
+			ahrs.accel.z 	= (velocity.z - velocity_old.z) / (dt * 100);
 
-			position.x 	+= velocity.x * dt;
-			position.z  += velocity.z * dt;
-			position.z 	= Math.min(position.z, 4000)
+			//trace(velocity.z, (velocity.z - velocity_old.z) * 100, ahrs.accel.z* 100);
+
+			velocity_old.x 	= velocity.x;
+			velocity_old.z 	= velocity.z;
+
+			position.x 		+= velocity.x * dt;
+			position.z  	+= velocity.z * dt;
+			position.z 		= Math.min(position.z, 4000)
 
 			airspeed.x  	= (velocity.x - wind.x);
 			airspeed.z  	= (velocity.z - wind.z);
