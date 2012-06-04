@@ -226,7 +226,7 @@
 		// --------------------------------------
 		public var dTnav							:Number = 0.25;
 		public var G_Dt								:Number = 0.01;
-		public var m_dt								:Number = 0.1;
+		public var m_dt								:Number = 0.02;
 		public var elapsed							:int = 0;
 		private var medium_loop_counter				:int = 0;
 		private var gps_counter						:int = 0;
@@ -342,6 +342,7 @@
 		public var alt_change						:Number = 0;
 
 		public var nav_thrust_z						:Number = 0;
+		public var d_alt_accel						:Number = 0;
 
 		// -----------------------------------------
 		// Loiter and NAV
@@ -413,6 +414,8 @@
 		public var command_yaw_dir					:Number = 0;
 		public var command_yaw_relative				:Number = 0;
 
+		public var cos_roll_x						:Number = 0;
+		public var cos_pitch_x						:Number = 0;
 
 		// -----------------------------------------
 		// GPS Latency patch
@@ -429,9 +432,10 @@
 		// -----------------------------------------
 		public var roll_axis						:Number = 0;
 		public var do_flip							:Boolean = false;
-		public var AAP_timer						:int = 0;
-		public var AAP_state 						:int = 0;
-		public const AAP_THR_INC					:int = 180;
+		public var flip_timer						:int = 0;
+		public var flip_state 						:int = 0;
+
+		public const AAP_THR_INC					:int = 170;
 		public const AAP_THR_DEC					:int = 90;
 		public const AAP_ROLL_OUT					:int = 2000;
 
@@ -572,6 +576,8 @@
 			m.addItem(new QuickMenuItem("Alt Hold Rate P",		"alt_rate_p"));
 			m.addItem(new QuickMenuItem("Alt Hold Rate I",		"alt_rate_i"));
 			m.addItem(new QuickMenuItem("Alt Hold Rate D",		"alt_rate_d"));
+			m.addItem(new QuickMenuItem("Accel D",				"d_alt_accel"));
+
 			m.addDivider(new QuickMenuDivider());
 
 			// AP
@@ -618,7 +624,7 @@
 			stage.addEventListener(KeyboardEvent.KEY_UP,keyUpHandler);
 			stage.addEventListener(KeyboardEvent.KEY_DOWN,keyDownHandler);
 
-			sim_controller.setLabel("Start Sim");
+			sim_controller.setLabel("START SIM");
 			sim_controller.setEventName("RUN_SIM");
 			stage.addEventListener("RUN_SIM",simHandler);
 
@@ -652,6 +658,9 @@
 			//addChildAt(plotView, 0);
 			plotView.dataScaleY		= 0.25
 			plotView.dataScaleX		= 3.0
+
+			plotMenu.setSelectedItemByName("WP Distance");
+			plotMenu.setSelectedItemByName("Roll Sensor");
 
 			this.addEventListener(Event.ENTER_FRAME, idle);
 		}
@@ -710,6 +719,12 @@
 					stopSIM();
 				}
 
+				// reads all of the necessary trig functions for cameras, throttle, etc.
+				// --------------------------------------------------------------------
+				update_trig();
+
+				// check for new GPS messages
+				// --------------------------
 				update_GPS();
 
 				// perform 10hz tasks
@@ -775,7 +790,7 @@
 
 					medium_loopCounter++;
 					elapsed_time_tf.text = formatTime(elapsed) + " " + iteration.toString();
-					copter.speed = x_actual_speed;
+
 					//debug_TF.text = x_actual_speed +"\n"+ x_target_speed.toFixed(2) + "\n" + x_rate_error.toFixed(2)  + "\n" +ahrs.roll_sensor.toFixed(2)+"\n"+ p_loiter_rate.toFixed(2)  + "\n" + i_loiter_rate.toFixed(2) + "\n" + d_loiter_rate.toFixed(2) ;
 					debug_TF.text = Math.floor(current_loc.alt) +"\n" + Math.floor(current_loc.lng) +"\n"+ Math.floor(x_actual_speed) +"\n" + Math.floor(climb_rate);
 
@@ -941,8 +956,12 @@
 		{
 			//var control_roll:Number = 0;
 			if (do_flip){
-				roll_flip();
-				return;
+				if(g.rc_1.control_in == 0){
+					roll_flip();
+					return;
+				}else{
+					do_flip = false;
+				}
 			}
 
 			switch(roll_pitch_mode){
@@ -1095,7 +1114,7 @@
 						}
 						// calc average throttle
 						if ((g.rc_3.control_in > MINIMUM_THROTTLE) && Math.abs(climb_rate) < 60){
-							throttle_avg = throttle_avg * .98 + g.rc_3.control_in * .02;
+							throttle_avg = throttle_avg * .99 + g.rc_3.control_in * .01;
 							g.throttle_cruise = throttle_avg;
 						}
 
@@ -1167,13 +1186,15 @@
 					//g.rc_3.servo_out = (g.rc_3.servo_out * (THROTTLE_FILTER_SIZE - 1) + throttle_out) / THROTTLE_FILTER_SIZE;
 
 					//var desired_accel:Number = copter.gravity;
+					/*
 					var thr_tmp:Number = (g.rc_3.radio_in - 1500) / 500;
 					var desired_accel:Number = copter.gravity + 400 * thr_tmp;
-					//desired_accel = 981;
+					desired_accel = 981;
 
-					nav_thrust_z = (desired_accel * g.throttle_cruise) / (copter.gravity * Math.cos(radiansx100(ahrs.roll_sensor)));
+					nav_thrust_z = (desired_accel * g.throttle_cruise) / (copter.gravity * cos_roll_x);
+					*/
 					//trace(" ", thr_tmp, desired_accel, nav_thrust_z, ahrs.roll_sensor);
-					//trace("nav_thrust_z", nav_thrust_z)
+					//trace("nav_thrust_z", nav_thrust_z, throttle_out)
 
 					// no filter
 					g.rc_3.servo_out = throttle_out;
@@ -1318,7 +1339,6 @@
 			}
 		}
 
-
 		public function update_GPS()
 		{
 			if(g_gps.new_data == true){
@@ -1326,7 +1346,7 @@
 				g_gps.new_data = false;
 				nav_ok = true;
 
-				current_loc.lng = g_gps.longitude;
+				current_loc.lng = g_gps.longitude// + x_actual_speed/2;
 				//current_loc.lat = g_gps.latitude;
 				calc_XY_velocity();
 				//Log_Write_GPS();
@@ -1427,10 +1447,24 @@
 			d_alt_rate			= g.pid_throttle.get_d(z_error, m_dt);
 			d_alt_rate			= constrain(d_alt_rate, -2000, 2000);
 
+
+			// acceleration error
+			var z_desired_accel :Number = 0;
+			var z_accel_error	:Number = 0;
+			z_accel_error 		= 	z_desired_accel - ahrs.accel.z;
+
+
+			//var accel_d:Number 		= ahrs.accel.z;
+
 			if (Math.abs(climb_rate) < 20)
 				d_alt_rate = 0;
 
 			output					= p_alt_rate + i_alt_rate + d_alt_rate;
+			d_alt_accel				= ahrs.accel.z * -10;
+			output					+= d_alt_accel;
+
+			//trace("output"+ output + "z_accel_error", z_accel_error);
+
 			// limit the rate
 			output					= constrain(output, -80, 120);
 
@@ -1516,13 +1550,14 @@
 
 		public function get_angle_boost(value:Number):Number
 		{
-			var temp:Number = Math.cos(radiansx100(ahrs.roll_sensor));
+			/*
+			var temp:Number = cos_pitch_x * cos_roll_x;
 			//temp = 1.0 - constrain(temp, .5, 1.0);
 			temp = 1.0 - temp;
 			return Math.floor(constrain(temp * value, 0, 240));
+			*/
+			return (g.throttle_cruise / (cos_pitch_x * cos_roll_x)) - g.throttle_cruise;
 		}
-
-
 
 		// -----------------------------------------------------------------------------------
 		// commands.pde
@@ -1657,7 +1692,7 @@
 			// -------------------
 			// no need to save this to EPROM
 			set_cmd_with_index(home, 0);
-			trace("init_home")
+
 			//print_wp(home, 0);
 
 			// Save prev loc this makes the calcs look better before commands are loaded
@@ -3104,13 +3139,13 @@
 				alt_change_flag = REACHED_ALT;
 				//Serial.printf("reached alt\n");
 			}
+
 			//Serial.printf("new alt: %d Org alt: %d\n", target_altitude, original_altitude);
 		}
 
 		public function get_new_altitude():Number
 		{
 			// returns a new next_WP.alt
-
 			if(alt_change_flag == ASCENDING){
 
 				// we are below, going up
@@ -3172,7 +3207,6 @@
 			}
 			// for generating delta time
 			alt_change_timer = millis();
-
 			return original_altitude + alt_change;
 		}
 
@@ -3230,6 +3264,12 @@
 			// copy over I term to Loiter_Rate
 			g.pid_loiter_rate_lon.set_integrator(g.pid_nav_lon.get_integrator());
 
+		}
+
+		public function update_trig():void
+		{
+			cos_pitch_x = 1;
+			cos_roll_x 	= Math.cos(radiansx100(ahrs.roll_sensor));
 		}
 
 		// call at 10hz
@@ -3383,22 +3423,38 @@
 		// flip.pde
 		//------------------------------------------------------------------------------------
 
-		public function roll_flip()
+		public function init_flip():void
 		{
-			// State machine
-			switch (AAP_state){
+			if(do_flip == false){
+				do_flip = true;
+				flip_timer = 0;
+				flip_state = 0;
+			}
+		}
+
+
+		public function roll_flip():void
+		{
+			// Yaw
+			//g.rc_4.servo_out = get_stabilize_yaw(nav_yaw);
+
+			// Pitch
+			//g.rc_2.servo_out = get_stabilize_pitch(0);
+
+			// Roll State machine
+			switch (flip_state){
 				case 0: // Step 1 : Initialize
-					AAP_timer = 0;
-					AAP_state++;
+					flip_timer = 0;
+					flip_state++;
 					break;
 				case 1: // Step 2 : Increase throttle to start maneuver
-					if (AAP_timer < 95){ 	// .5 seconds
+					if (flip_timer < 95){ 	// .5 seconds
 						g.rc_1.servo_out = get_stabilize_roll(0);
 						g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC;
-						AAP_timer++;
+						flip_timer++;
 					}else{
-						AAP_state++;
-						AAP_timer = 0;
+						flip_state++;
+						flip_timer = 0;
 					}
 					break;
 
@@ -3406,35 +3462,35 @@
 					if (ahrs.roll_sensor < 4500){
 						// Roll control
 						g.rc_1.servo_out = AAP_ROLL_OUT;
-						g.rc_3.servo_out = g.rc_3.control_in - AAP_THR_DEC;
+						g.rc_3.servo_out = g.rc_3.control_in;
 					}else{
-						AAP_state++;
+						flip_state++;
 					}
 					break;
 
 				case 3: // Step 4 : CONTINUE ROLL (until we reach a certain angle [-45deg])
-					if ((ahrs.roll_sensor >= 4500) || (ahrs.roll_sensor < -4500)){
+					if((ahrs.roll_sensor >= 4500) || (ahrs.roll_sensor < -9000)){// we are in second half of roll
 						g.rc_1.servo_out = 0;
 						g.rc_3.servo_out = g.rc_3.control_in - AAP_THR_DEC;
 					}else{
-						AAP_state++;
+						flip_state++;
 					}
 					break;
 
 				case 4: // Step 5 : Increase throttle to stop the descend
-					if (AAP_timer < 90){ // .5 seconds
+					if (flip_timer < 90){ // .5 seconds
 						g.rc_1.servo_out = get_stabilize_roll(0);
-						g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC;
-						AAP_timer++;
+						g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC + 30;
+						flip_timer++;
 					}else{
-						AAP_state++;
-						AAP_timer = 0;
+						flip_state++;
+						flip_timer = 0;
 					}
 					break;
 
 				case 5: // exit mode
-					AAP_timer = 0;
-					AAP_state = 0;
+					flip_timer = 0;
+					flip_state = 0;
 					do_flip = false;
 					break;
 			}
@@ -3694,6 +3750,7 @@
 
 			// clearing value used in interactive alt hold
 			manual_boost = 0;
+			reset_throttle_flag = false;
 
 			// clearing value used to force the copter down in landing mode
 			landing_boost = 0;
@@ -3878,15 +3935,16 @@
 			simIsRunnning = false;
 			this.removeEventListener(Event.ENTER_FRAME, runSim);
 			this.addEventListener(Event.ENTER_FRAME, idle);
-			sim_controller.setLabel("Start Sim");
+			sim_controller.setLabel("START SIM");
 			update_arm_label();
 			init_disarm_motors();
+			init_sim();
 		}
 
 		private function startSIM():void
 		{
 			trace("start sim")
-			sim_controller.setLabel("Stop Sim");
+			sim_controller.setLabel("STOP SIM");
 			simIsRunnning = true;
 			g.updateGains();
 			init_sim();
@@ -3919,15 +3977,12 @@
 			baro.enable_noise	= g.baro_noise_checkbox.getSelected();
 			fastPlot			= g.fastPlot_checkbox.getSelected();
 
-
 			copter.loc.lng 		= copter.position.x;
 			copter.loc.alt 		= copter.position.z;
 			current_loc.lng		= copter.loc.lng;
 			current_loc.alt		= copter.loc.alt;
 			copter.windGenerator.resetWind();
 
-			// hack
-			init_home();
 
 			reset_I_all();
 			reset_nav_params();
@@ -3936,7 +3991,6 @@
 			g_gps.init();
 			copter.roll_target 	= nav_lon = 0;
 			ahrs.roll_sensor	= g.start_angle_BI.getNumber();
-			trace("ahrs.roll_sensor")
 			copter.rotation 	= ahrs.roll_sensor;
 
 			// Copter state
@@ -3946,6 +4000,8 @@
 			radio_failure 		= false;
 
 
+			// hack
+			init_home();
 
 			// setup our next WP
 			var nwp = new Location();
@@ -4038,7 +4094,7 @@
 
 		private function keyUpHandler(k:KeyboardEvent):void
 		{
-			trace(k.keyCode);
+			//trace(k.keyCode);
 
 			if(k.shiftKey){
 				switch(k.keyCode){
@@ -4078,6 +4134,22 @@
 					case 189: // 11 "-"
 						set_mode(APPROACH);
 						break;
+					// --------------------------------------------------------------------------
+					// Plot control
+					// --------------------------------------------------------------------------
+					case 38: // Up
+						plotView.setScale(plotView.dataScaleX, (plotView.dataScaleY + .01))
+						break;
+					case 40: // Down
+						plotView.setScale(plotView.dataScaleX, (plotView.dataScaleY -.01))
+						break;
+					case 37: // Left
+						plotView.setScale((plotView.dataScaleX-1), plotView.dataScaleY)
+						break;
+					case 39: // Right
+						plotView.setScale((plotView.dataScaleX+1), plotView.dataScaleY)
+						break;
+
 				}
 			}
 
@@ -4113,28 +4185,7 @@
 					break;
 
 				case 76: // l for loop
-					do_flip = true;
-					break;
-
-
-				case 76: // l for loop
-					do_flip = true;
-					break;
-
-				// --------------------------------------------------------------------------
-				// Plot control
-				// --------------------------------------------------------------------------
-				case 38: // Up
-					plotView.setScale(plotView.dataScaleX, (plotView.dataScaleY + .01))
-					break;
-				case 40: // Down
-					plotView.setScale(plotView.dataScaleX, (plotView.dataScaleY -.01))
-					break;
-				case 37: // Left
-					plotView.setScale((plotView.dataScaleX-1), plotView.dataScaleY)
-					break;
-				case 39: // Right
-					plotView.setScale((plotView.dataScaleX+1), plotView.dataScaleY)
+					init_flip();
 					break;
 
 			}
@@ -4142,7 +4193,8 @@
 
 		private function plotMenuHandler(e:Event):void
 		{
-			var item:QuickMenuItem = plotMenu.getSelectedItem();
+			var item:QuickMenuItem;
+			item = plotMenu.getSelectedItem();
 			this.plotType_A = item.getCode();
 			plotMenu.setLabel(item.getLabel());
 
@@ -4310,12 +4362,16 @@
 					val = d_alt_rate;
 				break;
 
+				case "d_alt_accel":
+					val = d_alt_accel * 100;
+				break;
+
 				case "accel_x":
-					val = copter.accel.x;
+					val = ahrs.accel.x * 100;
 				break;
 
 				case "accel_z":
-					val = copter.accel.z;
+					val = ahrs.accel.z * 100;
 				break;
 
 
