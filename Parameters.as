@@ -33,7 +33,7 @@ package com {
 		// ---------------------------------------------
 		// Sim Details controls
 		// ---------------------------------------------
-		public var sim_iterations			:int 		= 5000;
+		public var sim_iterations			:int 		= 50000;
 		public var windSpeedMin				:Number 	= 25;
 		public var windSpeedMax				:Number 	= 100;
 		public var windPeriod				:Number 	= 30000;
