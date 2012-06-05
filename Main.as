@@ -298,7 +298,7 @@
 		public var plotType_A						:String = "";
 		public var plotType_B						:String = "";
 		public var fastPlot							:Boolean = true;
-
+		public var roll_output						:Number;
 
 		// -----------------------------------------
 		// Flight Modes
@@ -563,12 +563,15 @@
 			m.addItem(new QuickMenuItem("Stabilize Rate I", 	"rate_i"));
 			m.addItem(new QuickMenuItem("Stabilize Rate D", 	"rate_d"));
 			m.addItem(new QuickMenuItem("Stabilize Dampener", 	"rate_damp"));
+			m.addItem(new QuickMenuItem("Roll Output", 			"roll_output"));
+
 			m.addDivider(new QuickMenuDivider());
 
 			// Alt Hold
 			m.addItem(new QuickMenuItem("Altitude",				"altitude"));
 			m.addItem(new QuickMenuItem("Next WP Alt",			"next_wp_alt"));
-			m.addItem(new QuickMenuItem("Altitude Error",		"altitude_error"));
+			m.addItem(new QuickMenuItem("Altitude Err",			"altitude_error"));
+			m.addItem(new QuickMenuItem("Actual Altitude Err",	"act_altitude_error"));
 			m.addItem(new QuickMenuItem("Desired Climb Rate",	"z_target_speed"));
 			m.addItem(new QuickMenuItem("Alt Hold I",			"alt_hold_i"));
 
@@ -610,6 +613,9 @@
 			m.addItem(new QuickMenuItem("throttle Cruise",		"throttle_cruise"));
 			m.addItem(new QuickMenuItem("Angle Boost",			"angle_boost"));
 			m.addItem(new QuickMenuItem("Throttle Output",		"throttle_out"));
+			m.addItem(new QuickMenuItem("Motor 1",				"motor_1"));
+			m.addItem(new QuickMenuItem("Motor 2",				"motor_2"));
+
 			m.addItem(new QuickMenuItem("Wind Speed",			"wind_speed"));
 		}
 
@@ -710,6 +716,7 @@
 
 		public function loop():void
 		{
+			iteration++;
 			fast_loop();
 			// 50 hz pieces
 			if(fifty_toggle){
@@ -1342,7 +1349,7 @@
 		public function update_GPS()
 		{
 			if(g_gps.new_data == true){
-				iteration++;
+				//iteration++;
 				g_gps.new_data = false;
 				nav_ok = true;
 
@@ -1365,16 +1372,16 @@
 
 			angle_error 		= wrap_180(target_angle - ahrs.roll_sensor);
 
-			// limit the error we're feeding to the PID
-			angle_error 		= constrain(angle_error, -2500, 2500);
-
-			// convert to desired Rate:
-			//target_angle 		= g.pi_stabilize_roll.get_pi(target_angle, G_Dt);
-
 			// convert to desired Rate:
 			p_stab 				= g.pi_stabilize_roll.get_p(angle_error);
-			i_stab 				= 0; //g.pi_stabilize_roll.get_i(angle_error, G_Dt);
 
+
+			if(Math.abs(ahrs.roll_sensor) < 500){
+				angle_error 		= constrain(angle_error, -500, 500);
+				i_stab 				= g.pi_stabilize_roll.get_i(angle_error, G_Dt);
+			}else{
+				i_stab 				= g.pi_stabilize_roll.get_integrator();
+			}
 			return get_rate_roll(p_stab) + i_stab;
 		}
 
@@ -1393,7 +1400,6 @@
 			var output			:Number = 0;
 
 			// get current rate
-			//current_rate 	= (omega.x * DEGX100);
 			current_rate 	= (ahrs.omega.x * DEGX100);
 
 			// calculate and filter the acceleration
@@ -1418,7 +1424,12 @@
 			output -= rate_d_dampener;
 
 			// constrain output
-			output = constrain(output, -2500, 2500);
+			//if(g.test)
+			//	output = constrain(output, -4500, 4500);
+			//else
+				output = constrain(output, -2500, 2500);
+
+			roll_output = output
 
 			// output control
 			return output;
@@ -1460,9 +1471,9 @@
 				d_alt_rate = 0;
 
 			output					= p_alt_rate + i_alt_rate + d_alt_rate;
-			d_alt_accel				= ahrs.accel.z * -10;
+			d_alt_accel				= -ahrs.accel.z * g.alt_D;
 			output					+= d_alt_accel;
-
+			//trace(ahrs.accel.z);
 			//trace("output"+ output + "z_accel_error", z_accel_error);
 
 			// limit the rate
@@ -1556,7 +1567,14 @@
 			temp = 1.0 - temp;
 			return Math.floor(constrain(temp * value, 0, 240));
 			*/
-			return (g.throttle_cruise / (cos_pitch_x * cos_roll_x)) - g.throttle_cruise;
+			var temp:Number = cos_pitch_x * cos_roll_x;
+			if(temp < 0) temp = 1;
+			temp = constrain(temp, .5, 1);
+			trace(temp,ahrs.roll_sensor);
+
+			return (g.throttle_cruise / temp) - g.throttle_cruise;
+
+
 		}
 
 		// -----------------------------------------------------------------------------------
@@ -2897,6 +2915,9 @@
 
 			roll_out 	 		= g.rc_1.pwm_out; // 157 pwm
 			//pitch_out 	 	= g.rc_2.pwm_out;
+
+			//trace(Math.floor(g.rc_3.control_in),Math.floor(g.rc_3.servo_out), Math.floor(g.rc_3.radio_out), roll_out)
+
 			// right motor
 			motor_out[MOT_1]	= g.rc_3.radio_out - roll_out;
 			// left motor
@@ -2911,13 +2932,14 @@
 			 * ensures that we retain control when one or more of the motors
 			 * is at its maximum output
 			 */
-			/*for (int i = MOT_1; i <= MOT_4; i++){
-					if(motor_out[i] > out_max){
-						// note that i^1 is the opposite motor
-						motor_out[i ^ 1] -= motor_out[i] - out_max;
-						motor_out[i] = out_max;
-					}
-			}*/
+
+			for (var i:int = MOT_1; i <= MOT_2; i++){
+				if(motor_out[i] > out_max){
+					// note that i^1 is the opposite motor
+					motor_out[i ^ 1] -= motor_out[i] - out_max;
+					motor_out[i] = out_max;
+				}
+			}
 
 			// XXX do simple implementation
 
@@ -2925,11 +2947,16 @@
 			motor_out[MOT_1]	= Math.max(motor_out[MOT_1], 	out_min);
 			motor_out[MOT_2]	= Math.max(motor_out[MOT_2], 	out_min);
 
+			motor_out[MOT_1]	= Math.min(motor_out[MOT_1], 	out_max);
+			motor_out[MOT_2]	= Math.min(motor_out[MOT_2], 	out_max);
+
 			// cut motors
 			if(g.rc_3.servo_out == 0){
 				motor_out[MOT_1]	= g.rc_3.radio_min;
 				motor_out[MOT_2]	= g.rc_3.radio_min;
 			}
+
+			//trace("motors", Math.floor(motor_out[MOT_1]), Math.floor(motor_out[MOT_2]));
 
 			apm_rc.outputCh(MOT_1, motor_out[MOT_1]);
 			apm_rc.outputCh(MOT_2, motor_out[MOT_2]);
@@ -3972,6 +3999,7 @@
 
 			copter.setThrottleCruise(g.throttle_cruise);
 			copter.velocity.x	= g.start_speed_BI.getNumber();
+			copter.velocity.z	= g.start_climb_rate_BI.getNumber();
 			copter.position.x 	= g.start_position_BI.getNumber();
 			copter.position.z 	= g.start_height_BI.getNumber(); // add in some delay
 			baro.enable_noise	= g.baro_noise_checkbox.getSelected();
@@ -3999,6 +4027,7 @@
 			failsafeCounter		= 0;
 			radio_failure 		= false;
 
+			ahrs.roll_speed.x	= g.start_rotation_BI.getNumber();
 
 			// hack
 			init_home();
@@ -4232,13 +4261,15 @@
 
 		private function plot(ptype:String, plot_num:int, plot_label:int):void
 		{
-			var val:Number = 0;
+			var val		:Number = 0;
+			var _scale	:Number = 1;
 
 			switch (ptype)
 			{
 				// stabilze
 				case "roll_sensor":
 					val = ahrs.roll_sensor;
+					_scale = .1;
 				break;
 				case "control_roll":
 					val = control_roll;
@@ -4272,6 +4303,9 @@
 				break;
 				case "rate_damp":
 					val = rate_d_dampener;
+				break;
+				case "roll_output":
+					val = roll_output;
 				break;
 
 				//case "desired_speed":
@@ -4329,8 +4363,6 @@
 					val = d_nav_rate;
 				break;
 
-
-
 				case "altitude":
 					val = current_loc.alt;
 				break;
@@ -4340,6 +4372,9 @@
 
 				case "altitude_error":
 					val = altitude_error;
+				break;
+				case "act_altitude_error":
+					val = (next_WP.alt - copter.loc.alt);
 				break;
 
 				case "z_target_speed":
@@ -4363,15 +4398,18 @@
 				break;
 
 				case "d_alt_accel":
-					val = d_alt_accel * 100;
+					val = d_alt_accel;
+					_scale = 100;
 				break;
 
 				case "accel_x":
-					val = ahrs.accel.x * 100;
+					val = ahrs.accel.x
+					_scale = 100;
 				break;
 
 				case "accel_z":
-					val = ahrs.accel.z * 100;
+					val = ahrs.accel.z;
+					_scale = 100;
 				break;
 
 
@@ -4388,6 +4426,14 @@
 					val = g.rc_3.servo_out;
 				break;
 
+				case "motor_1":
+					val = motor_out[MOT_1] - 1000;
+				break;
+
+				case "motor_2":
+					val = motor_out[MOT_2] - 1000;
+				break;
+
 				case "wind_speed":
 					val = copter.wind.x;
 				break;
@@ -4397,7 +4443,7 @@
 				//no case tested true;
 			}
 
-			plotView.setValue(val,	plot_num);
+			plotView.setValue(val,	plot_num, _scale);
 
 			if(plot_label == 1)
 				plot_TF.text = val.toFixed(2);
