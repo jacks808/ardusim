@@ -63,6 +63,8 @@ package com {
 		// Environment
 		// -----------------------------------------
 		public var start_angle_BI			:BasicInput;
+		public var start_climb_rate_BI		:BasicInput;
+		public var start_rotation_BI		:BasicInput;
 		public var start_speed_BI			:BasicInput;
 		public var start_position_BI		:BasicInput;
 		public var start_height_BI			:BasicInput;
@@ -77,6 +79,8 @@ package com {
 		public var axis_enabled_checkbox	:QuickCheckBox;
 		public var sonar_checkbox			:QuickCheckBox;
 		public var rtl_land_checkbox		:QuickCheckBox;
+
+		public var test_checkbox			:QuickCheckBox;
 
 		public var NTUN_checkbox			:QuickCheckBox;
 		public var CTUN_checkbox			:QuickCheckBox;
@@ -123,6 +127,8 @@ package com {
 		public var throttle_error_BI		:BasicInput;
 
 		public var alt_D_BI					:BasicInput;
+
+		public var test						:Boolean = false;
 
 		// -----------------------------------------
 		// Sensors
@@ -312,6 +318,7 @@ package com {
 
 			NTUN_checkbox.setLabel("Log NTUN");
 			CTUN_checkbox.setLabel("Log CTUN");
+			test_checkbox.setLabel("Test Option");
 
 			initGains();
 		}
@@ -337,6 +344,8 @@ package com {
 			sonar_checkbox.setSelected(sonar_enabled);
 			rtl_land_checkbox.setSelected(rtl_land_enabled);
 
+			// for testing alternatives
+			test_checkbox.setSelected(test);
 
 			// loiter
 			loiter_hold_P_BI.setNumber(loiter_p);
@@ -380,6 +389,8 @@ package com {
 			wind_high_BI.setNumber(windSpeedMax);
 			wind_period_BI.setNumber(windPeriod/1000);
 			start_speed_BI.setNumber(0);
+			start_rotation_BI.setNumber(0);
+			start_climb_rate_BI.setNumber(0);
 			start_angle_BI.setNumber(0);
 
 			motor_kv_BI.setNumber(motor_kv);
@@ -410,6 +421,8 @@ package com {
 			sonar_enabled				= sonar_checkbox.getSelected();
 			rtl_land_enabled			= rtl_land_checkbox.getSelected();
 
+			// for testing alternatives
+			test						= test_checkbox.getSelected();
 
 			// loiter
 			pi_loiter_lon._kp			= loiter_hold_P_BI.getNumber();
