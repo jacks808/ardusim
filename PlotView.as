@@ -108,9 +108,9 @@ package com {
 			plots = new Array();
 		}
 
-		public function setValue(val:Number, plot_index:Number){
+		public function setValue(val:Number, plot_index:Number, _scale:Number = 1){
 			//val = 0;
-			plots[plot_index].set_value(-val);
+			plots[plot_index].set_value(-val, _scale);
 		}
 	}
 }

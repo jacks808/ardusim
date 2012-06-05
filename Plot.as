@@ -41,9 +41,11 @@ package com {
 		public function addedToStage(event:Event):void {
 		}
 
-		public function set_value(val:Number){
+		public function set_value(val:Number, _scale:Number = 1){
+			val *= _scale;
 			if(_index == 0)
 				last_value = val;
+
             graphics.lineStyle(.25, _color);
             graphics.moveTo(_index-1, last_value);
             graphics.lineTo(_index, val);
