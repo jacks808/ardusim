@@ -40,7 +40,7 @@ package com {
 
 		public function outputCh(ch:int, pwm:int):int
 		{
-			//trace("outputCH",ch, pwm);
+
 			return  output_pwm[ch] = pwm;
 		}
 

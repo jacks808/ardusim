@@ -55,7 +55,7 @@
 		public var rot_thrust				:Vector3D;			//
 		public var angle_boost				:Number;
 		public var windGenerator			:Wind;			//
-
+		public var rotation_bias			:Number = 1;
 
 		public function Copter():void
 		{
@@ -112,12 +112,15 @@
 
 			rot_thrust.x 		-= g.motor_kv  * motor_output_0;
 			rot_thrust.x  		+= g.motor_kv  * motor_output_1;
+			//rot_thrust.x		+= 57100 ;
 			rot_thrust.x 		/= g.moment;
 
 			ahrs.roll_speed.x	+= rot_thrust.x * dt;
 			ahrs.roll_sensor	+= ahrs.roll_speed.x * dt;
 			ahrs.roll_sensor	= wrap_180(ahrs.roll_sensor);
 			ahrs.omega.x 		= radiansx100(ahrs.roll_speed.x);
+
+			//trace(ahrs.roll_speed.x);
 
 			// calc thrust
 			//get_motor_output returns 0 : 1000
