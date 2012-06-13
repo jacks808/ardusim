@@ -278,7 +278,6 @@ package com {
 		}
 
 
-
 		public function range_to_pwm():Number
 		{
 			return ((servo_out - _low_out) * (radio_max - radio_min)) / (_high_out - _low_out);
