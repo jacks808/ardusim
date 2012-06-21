@@ -4,10 +4,12 @@ package com {
 
 	public class GPS extends Location{
 
-		public var longitude:Number = 0;
-		public var long_est:Number = 0;
-		public var latitude:Number = 0;
-		public var altitude:Number = 0;
+		public var longitude		:Number = 0;
+		public var long_est			:Number = 0;
+		public var latitude			:Number = 0;
+		public var altitude			:Number = 0;
+		private var gps_counter		:int = 0;
+
 
 		public var new_data		:Boolean = false;
 		public var fix			:Boolean = true;
@@ -67,12 +69,25 @@ package com {
 				delay_array[i].lat = _copter_loc.lat;
 				delay_array[i].lng = _copter_loc.lng;
 			}
-			new_data = false;
-        	pointer = 0;
+			new_data 	= false;
+        	pointer 	= 0;
+        	gps_counter = 0;
         }
 
-        public function read():void {
-        	pointer++
+
+        public function read():Boolean
+        {
+			gps_counter++;
+			if(gps_counter >= 25){
+				gps_counter = 0;
+				read_internal()
+				return true;
+			}
+			return false;
+        }
+
+        public function read_internal():void {
+        	pointer++;
         	if (pointer >= max_delay)
         		pointer = 0;
 
@@ -114,6 +129,11 @@ package com {
 			latitude  = delay_array[old_pointer].lat;
 			altitude  = delay_array[old_pointer].alt;
         }
+
+		//public function get_distance(loc1:Location, loc2:Location):Number
+		//{
+		//	return	Math.abs(Math.floor((loc2.lng - loc1.lng) * 1.113195));
+		//}
 
 		public function fixrez(n:Number):Number
 		{

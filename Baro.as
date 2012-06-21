@@ -51,7 +51,11 @@
 
 		public function init():void
 		{
+			for(var i:int = 0; i < delay_array.length; i++){
+				delay_array[i].alt = _copter_loc.alt;
+			}
 			index = 0;
+			altitude = _copter_loc.alt;
 		}
 
 		public function read():Number
@@ -66,7 +70,9 @@
 			var old_pointer:int = (pointer + 1) % max_delay;
 
 			altitude  = delay_array[old_pointer].alt;
+
 			index++;
+
 			if (index >= l)
 				index = 0;
 

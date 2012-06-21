@@ -27,6 +27,7 @@
 	import com.Plot;
 	import com.PlotView;
 	import com.AverageFilter;
+	import com.LeadFilter;
 	import com.QuickMenu;
 	import com.QuickMenuItem;
 	import com.QuickMenuDivider;
@@ -40,6 +41,7 @@
 	import com.Motors;
 	import com.Relay;
 	import com.APM_RC;
+	import com.User;
 
 
 	public class Main extends MovieClip
@@ -48,6 +50,7 @@
 		// SIM and Data
 		// --------------------------------------
 		public var g								:Parameters;
+		public var user								:User;
 		public var simIsRunnning					:Boolean = false;
 		public var iteration						:int = 0;
 		public var copter							:Copter;
@@ -118,7 +121,7 @@
 		public const DESCENDING						:int = -1;
 		public const REACHED_ALT					:int = 0;
 		public const MINIMUM_THROTTLE				:int = 130;
-		public const MAXIMUM_THROTTLE				:int = 850;
+		public const MAXIMUM_THROTTLE				:int = 1000;
 		public const RTL_APPROACH_DELAY				:int = 20;
 		public const WAYPOINT_SPEED_MIN				:int = 100;
 		public const THROTTLE_ADJUST				:int = 225;
@@ -134,8 +137,6 @@
 
 		public const MOT_1							:int = 0;
 		public const MOT_2							:int = 1;
-
-
 
 		public const RADX100						:Number = 0.000174532925;
 		public const DEGX100						:Number = 5729.57795;
@@ -229,7 +230,6 @@
 		public var m_dt								:Number = 0.02;
 		public var elapsed							:int = 0;
 		private var medium_loop_counter				:int = 0;
-		private var gps_counter						:int = 0;
 		private var fifty_toggle					:Boolean = false;
 		private var medium_loopCounter				:int = 0;
 		private var slow_loopCounter				:int = 0;
@@ -343,6 +343,9 @@
 
 		public var nav_thrust_z						:Number = 0;
 		public var d_alt_accel						:Number = 0;
+		public var z_boost							:Number = 0;
+
+
 
 		// -----------------------------------------
 		// Loiter and NAV
@@ -353,19 +356,16 @@
 		public var p_loiter_rate					:Number = 0;
 		public var i_loiter_rate					:Number = 0;
 		public var d_loiter_rate					:Number = 0;
-
 		public var p_nav_rate						:Number = 0;
 		public var i_nav_rate						:Number = 0;
 		public var d_nav_rate						:Number = 0;
-
 		public var nav_lon							:Number = 0;
 		public var nav_roll							:Number = 0;
-
 		public var x_rate_error						:Number = 0;
-
 		private var last_longitude					:Number	= 0;
-
 		public var lon_filter						:AverageFilter;
+		public var xFilter							:AverageFilter;
+		public var xLeadFilter						:LeadFilter;
 		private var nav_ok							:Boolean = false;
 		public var auto_roll						:Number = 0;
 		public var slow_wp							:Boolean = false;
@@ -375,9 +375,7 @@
 		public var wp_verify_byte					:int = 0;
 		public var loiter_override					:Boolean = false;
 		public var crosstrack_error					:Number = 0;
-		public var last_ground_speed				:Number = 0;
 		public var long_error						:Number = 0;
-		public var long_error_old					:Number = 0;
 		public var baro_alt							:Number	= 0;
 		public var baro_rate						:Number	= 0;
 		public var sonar_rate						:Number	= 0;
@@ -389,19 +387,14 @@
 		public var home_to_copter_bearing			:Number = 0;
 		public var target_bearing					:Number = 0;
 		public var old_target_bearing				:Number = 0;
-
 		public var original_target_bearing			:Number = 0;
 		public var nav_bearing						:Number = 0;
 		public var jump								:int = -10;
 		public var command_cond_index				:int = 0;
 		public var prev_nav_index					:int = 0;
 		public var command_nav_index				:int = 0;
-
-
 		public var condition_value					:Number = 0;
 		public var condition_start					:Number = 0;
-
-
 		public var nav_yaw							:Number = 0;
 		public var auto_yaw							:Number = 0;
 		public var yaw_tracking 					:int 	= 1; 		//MAV_ROI_WPNEXT;
@@ -413,10 +406,14 @@
 		public var command_yaw_speed				:Number = 0;
 		public var command_yaw_dir					:Number = 0;
 		public var command_yaw_relative				:Number = 0;
-
 		public var cos_roll_x						:Number = 0;
 		public var cos_pitch_x						:Number = 0;
 
+		public var accels_velocity					:Vector3D;
+		public var accels_position					:Vector3D;
+		public var accels_rotated					:Vector3D;
+		public var speed_error						:Vector3D;
+		public var accels_offset					:Vector3D;
 		// -----------------------------------------
 		// GPS Latency patch
 		// -----------------------------------------
@@ -476,7 +473,6 @@
 		public var altitude_error					:Number = 0;
 		public var old_altitude						:Number = 0;
 		public var old_alt							:Number = 0;
-		public var target							:Number = 500;
 		public var throttle_min						:Number = 0;
 		public var reset_throttle_flag				:Boolean = false;
 
@@ -489,6 +485,7 @@
 
 		public function Main():void
 		{
+			user 					= new User(); // recorded flight input
 			ahrs					= new AHRS();
 			apm_rc					= new APM_RC();
 			g_gps					= new GPS(copter.loc);
@@ -500,9 +497,16 @@
 			guided_WP				= new Location();
 			target_WP				= new Location();
 			circle_WP				= new Location();
-			sensor_speed			= new Vector3D;
+			sensor_speed			= new Vector3D();
+			accels_velocity			= new Vector3D();
+			accels_position			= new Vector3D();
+			speed_error				= new Vector3D();
+			accels_offset			= new Vector3D();
+			accels_rotated			= new Vector3D();
 			lon_filter				= new AverageFilter(g.speed_filter_size);
+			xFilter					= new AverageFilter(6);
 			roll_rate_d_filter		= new AverageFilter(3);
+			xLeadFilter				= new LeadFilter();
 			motors					= new Motors();
 			waypoints				= new Array();
 			motor_out				= new Array();
@@ -608,7 +612,11 @@
 
 
 			m.addItem(new QuickMenuItem("Accel X",				"accel_x"));
+			m.addItem(new QuickMenuItem("Accel Velocity X",		"vel_x"));
 			m.addItem(new QuickMenuItem("Accel Z",				"accel_z"));
+			m.addItem(new QuickMenuItem("Accel Velocity Z",		"vel_z"));
+			m.addItem(new QuickMenuItem("Accel Z boost",		"z_boost"));
+
 
 			m.addItem(new QuickMenuItem("throttle Cruise",		"throttle_cruise"));
 			m.addItem(new QuickMenuItem("Angle Boost",			"angle_boost"));
@@ -687,9 +695,6 @@
 				sky.failsafe_MC.visible = false;
 			}
 
-			// fake a GPS read
-			read_gps();
-
 			if (g_gps.new_data == true){
 				g_gps.new_data = false;
 				update_GPS();
@@ -699,24 +704,25 @@
 
 		public function runSim(e:Event):void
 		{
+			// 50hz update
 			update_sim_radio();
 
-			// run twice to get 100hz updates
-			loop();
-			elapsed += 10; // 50 * 20  = 1000 ms
-			loop();
-			elapsed += 10; // 50 * 20  = 1000 ms
-
-			// fake a GPS read
-			read_gps();
+			// run 2x to get 100hz updates
+			for(var i:int = 0; i < (g.sim_speed * 2); i++){
+				g_gps.read();// fake a GPS read
+				loop();
+				elapsed += 10; // 50 * 20  = 1000 ms
+			}
 
 			sky.draw();
 			sky.failsafe_MC.visible = radio_failure;
 		}
 
+
 		public function loop():void
 		{
 			iteration++;
+
 			fast_loop();
 			// 50 hz pieces
 			if(fifty_toggle){
@@ -770,6 +776,11 @@
 			read_radio();
 
 			// IMU DCM Algorithm
+			// --------------------
+			//read_AHRS();
+
+			if(g.inertia_checkbox.getSelected())
+				calc_inertia();
 
 			// custom code/exceptions for flight modes
 			// ---------------------------------------
@@ -799,7 +810,7 @@
 					elapsed_time_tf.text = formatTime(elapsed) + " " + iteration.toString();
 
 					//debug_TF.text = x_actual_speed +"\n"+ x_target_speed.toFixed(2) + "\n" + x_rate_error.toFixed(2)  + "\n" +ahrs.roll_sensor.toFixed(2)+"\n"+ p_loiter_rate.toFixed(2)  + "\n" + i_loiter_rate.toFixed(2) + "\n" + d_loiter_rate.toFixed(2) ;
-					debug_TF.text = Math.floor(current_loc.alt) +"\n" + Math.floor(current_loc.lng) +"\n"+ Math.floor(x_actual_speed) +"\n" + Math.floor(climb_rate);
+					debug_TF.text = current_loc.alt.toFixed(0) +"\n" + current_loc.lng.toFixed(0) +"\n"+ x_actual_speed.toFixed(0) +"\n" + climb_rate.toFixed(0);
 
 					break;
 
@@ -820,7 +831,8 @@
 						// update flight control system
 						update_navigation();
 
-						Log_Write_Nav_Tuning();
+						if(g.NTUN_checkbox.getSelected())
+							Log_Write_Nav_Tuning();
 					}
 					break;
 
@@ -846,7 +858,11 @@
 
 					if(motors.armed){
 						//if (g.log_bitmask & MASK_LOG_ATTITUDE_MED)
-						Log_Write_Attitude();
+						// increment user input
+						//user.next_roll();
+
+						if(g.ATT_checkbox.getSelected())
+							Log_Write_Attitude();
 
 						//if (g.log_bitmask & MASK_LOG_MOTORS)
 						//	Log_Write_Motors();
@@ -905,6 +921,10 @@
 						// save compass offsets
 						superslow_loopCounter = 0;
 					}
+
+					//g.rc_3.set_range((g.throttle_cruise - (MAXIMUM_THROTTLE - g.throttle_cruise)), MAXIMUM_THROTTLE);
+					//g.rc_3.set_range_out(0,1000);
+
 
 					// check the user hasn't updated the frame orientation
 					//if( !motors.armed ) {
@@ -1103,6 +1123,8 @@
 		{
 			var throttle_out:Number = 0;
 
+			//recalc throttle range
+
 			switch(throttle_mode){
 				case THROTTLE_MANUAL:
 					if (g.rc_3.control_in > 0){
@@ -1110,7 +1132,6 @@
 							g.rc_3.servo_out 	= g.rc_3.control_in;
 						}else{
 							angle_boost = get_angle_boost(g.throttle_cruise);
-							copter.angle_boost = angle_boost;
 							//angle_boost 		= get_angle_boost(g.rc_3.control_in);
 							g.rc_3.servo_out 	= g.rc_3.control_in + angle_boost;
 						}
@@ -1121,7 +1142,7 @@
 						}
 						// calc average throttle
 						if ((g.rc_3.control_in > MINIMUM_THROTTLE) && Math.abs(climb_rate) < 60){
-							throttle_avg = throttle_avg * .99 + g.rc_3.control_in * .01;
+							throttle_avg = throttle_avg * .999 + g.rc_3.control_in * .001;
 							g.throttle_cruise = throttle_avg;
 						}
 
@@ -1160,7 +1181,7 @@
 						clear_new_altitude();
 
 						// this lets us know we need to update the altitude after manual throttle control
-						reset_throttle_flag = true;
+						//reset_throttle_flag = true;
 
 					}else{
 						// we are under automatic throttle control
@@ -1186,7 +1207,9 @@
 							nav_throttle = Math.min(nav_throttle, 0);
 						}
 
-						throttle_out = g.throttle_cruise + nav_throttle + angle_boost - landing_boost;
+						//z_boost = get_z_boost();
+						z_boost = 0;
+						throttle_out = g.throttle_cruise + nav_throttle + angle_boost - z_boost - landing_boost;
 					}
 
 					// light filter of output
@@ -1207,6 +1230,11 @@
 					g.rc_3.servo_out = throttle_out;
 					break;
 			}
+		}
+
+		public function get_z_boost():Number
+		{
+			return (ahrs.accel.z * 100) / (981 / g.throttle_cruise);
 		}
 
 		// called after a GPS read
@@ -1276,7 +1304,7 @@
 					}
 
 					// Allow the user to take control temporarily,
-					if(loiter_override){
+					if(false){
 						// this sets the copter to not try and nav while we control it
 						wp_control 	= NO_NAV_MODE;
 
@@ -1353,10 +1381,14 @@
 				g_gps.new_data = false;
 				nav_ok = true;
 
-				current_loc.lng = g_gps.longitude// + x_actual_speed/2;
+				// we read  GPS every 250 ms
+				dTnav = .25;
+
+				//current_loc.lng = g_gps.longitude// + x_actual_speed/2;
 				//current_loc.lat = g_gps.latitude;
 				calc_XY_velocity();
-				//Log_Write_GPS();
+				if(g.GPS_checkbox.getSelected())
+					Log_Write_GPS();
 			}
 		}
 
@@ -1424,10 +1456,7 @@
 			output -= rate_d_dampener;
 
 			// constrain output
-			//if(g.test)
-			//	output = constrain(output, -4500, 4500);
-			//else
-				output = constrain(output, -2500, 2500);
+			output = constrain(output, -5000, 5000);
 
 			roll_output = output
 
@@ -1450,8 +1479,13 @@
 			// compensates throttle setpoint error for hovering
 			i_hold				= g.pi_alt_hold.get_i(z_error , m_dt);			// calculate desired speed from lon error
 
+
 			// calculate rate error
-			z_rate_error		= z_target_speed - climb_rate;		// calc the speed error
+			if(g.inertia_checkbox.getSelected()){
+				z_rate_error		= z_target_speed - accels_velocity.z;			// calc the speed error
+			}else{
+				z_rate_error		= z_target_speed - climb_rate;		// calc the speed error
+			}
 
 			p_alt_rate			= g.pid_throttle.get_p(z_rate_error);
 			i_alt_rate			= g.pid_throttle.get_i(z_rate_error + z_error, m_dt);
@@ -1459,22 +1493,10 @@
 			d_alt_rate			= constrain(d_alt_rate, -2000, 2000);
 
 
-			// acceleration error
-			var z_desired_accel :Number = 0;
-			var z_accel_error	:Number = 0;
-			z_accel_error 		= 	z_desired_accel - ahrs.accel.z;
-
-
-			//var accel_d:Number 		= ahrs.accel.z;
-
 			if (Math.abs(climb_rate) < 20)
 				d_alt_rate = 0;
 
 			output					= p_alt_rate + i_alt_rate + d_alt_rate;
-			d_alt_accel				= -ahrs.accel.z * g.alt_D;
-			output					+= d_alt_accel;
-			//trace(ahrs.accel.z);
-			//trace("output"+ output + "z_accel_error", z_accel_error);
 
 			// limit the rate
 			output					= constrain(output, -80, 120);
@@ -1561,20 +1583,10 @@
 
 		public function get_angle_boost(value:Number):Number
 		{
-			/*
-			var temp:Number = cos_pitch_x * cos_roll_x;
-			//temp = 1.0 - constrain(temp, .5, 1.0);
-			temp = 1.0 - temp;
-			return Math.floor(constrain(temp * value, 0, 240));
-			*/
 			var temp:Number = cos_pitch_x * cos_roll_x;
 			if(temp < 0) temp = 1;
 			temp = constrain(temp, .5, 1);
-			trace(temp,ahrs.roll_sensor);
-
-			return (g.throttle_cruise / temp) - g.throttle_cruise;
-
-
+			return ((g.throttle_cruise + 80) / temp) - (g.throttle_cruise +80);
 		}
 
 		// -----------------------------------------------------------------------------------
@@ -1691,6 +1703,7 @@
 			// reset speed governer
 			// --------------------
 			waypoint_speed_gov = WAYPOINT_SPEED_MIN;
+			trace("set_next_WP ", next_WP.lng)
 		}
 
 		// run this at setup on the ground
@@ -3071,6 +3084,8 @@
 				// rotate pitch and roll to the copter frame of reference
 				calc_loiter_pitch_roll();
 
+				limit_pitch_and_roll(altitude_error);
+
 			}else if(wp_control == NO_NAV_MODE){
 				// clear out our nav so we can do things like land straight down
 				// or change Loiter position
@@ -3087,16 +3102,43 @@
 
 		public function calc_loiter_pitch_roll():void
 		{
+			// rotate the vector
+			//auto_roll 	= (float)nav_lon * sin_yaw_y - (float)nav_lat * cos_yaw_x;
+			//auto_pitch 	= (float)nav_lon * cos_yaw_x + (float)nav_lat * sin_yaw_y;
+
 			auto_roll	= nav_lon
+			// flip pitch because forward is negative
+			//auto_pitch = -auto_pitch;
+		}
+
+		public function limit_pitch_and_roll(z_error:Number):void
+		{
+			if(z_error < 100)
+				return;
+
+			// do nothing unless we are below 1m
+			//z_error -= 100;
+
+			z_error = constrain((z_error -100), 0, 200 );
+
+			var fix:Number 		= z_error /200;
+			var aroll:Number 	= auto_roll;
+			var tmp:Number 		= fix * auto_roll;
+
+			auto_roll 			= auto_roll - (fix * auto_roll);
+
+			trace(z_error, aroll, tmp, 	auto_roll, ahrs.roll_sensor);
+//					300   -3000  -3000   0         -12.73333333333276
+
 		}
 
 		public function calc_desired_speed(max_speed:Number, _slow:Boolean):Number
 		{
 			if(_slow){
-				max_speed		= Math.min(max_speed, wp_distance / 2);
+				max_speed		= Math.min(max_speed, wp_distance / 3);
 				max_speed		= Math.max(max_speed, 0);
 			}else{
-				max_speed		= Math.min(max_speed, wp_distance);
+				max_speed		= Math.min(max_speed, wp_distance / 2);
 				max_speed		= Math.max(max_speed, WAYPOINT_SPEED_MIN);	// go at least 100cm/s
 			}
 
@@ -3240,6 +3282,7 @@
 		public function calc_location_error(next_loc:Location):void
 		{
 			long_error = next_loc.lng - current_loc.lng;
+			//long_error = next_loc.lng - copter.loc.lng // ideal position data
 		}
 
 		public function calc_loiter(x_error:Number):void
@@ -3247,7 +3290,14 @@
 			var output:Number;
 			x_target_speed			= g.pi_loiter_lon.get_p(x_error);			// calculate desired speed from lon error
 			//trace("x_error", x_error, "x_target_speed" ,x_target_speed, "x_actual_speed",x_actual_speed, "x_rate_error", x_rate_error)
-			x_rate_error			= x_target_speed - x_actual_speed;			// calc the speed error
+
+			if(g.inertia_checkbox.getSelected()){
+				x_rate_error		= x_target_speed - accels_velocity.x;			// calc the speed error
+			}else{
+				x_rate_error		= x_target_speed - x_actual_speed;		// calc the speed error
+			}
+
+			//x_rate_error			= x_target_speed - x_actual_speed;			// calc the speed error
 
 			p_loiter_rate			= g.pid_loiter_rate_lon.get_p(x_rate_error);
 			i_loiter_rate			= g.pid_loiter_rate_lon.get_i(x_rate_error + x_error , dTnav);
@@ -3265,32 +3315,33 @@
 		public function calc_nav_rate(max_speed:Number):void
 		{
 			var output:Number;
+
+			// push us towards the original track
+			//update_crosstrack();
+
 			// nav_bearing includes crosstrack
 			var temp:Number = (9000 - nav_bearing) * RADX100;
 
+
 			// East / West
-			//x_rate_error	= max_speed - x_actual_speed; // 413
-			x_target_speed	= (Math.cos(temp) * max_speed);
-			x_rate_error 	= x_target_speed - x_actual_speed; // 413
-
-			//x_rate_error	= constrain(x_rate_error, -1000, 1000);
+			x_rate_error 	= (Math.cos(temp) * max_speed) - x_actual_speed; // 413
+			x_rate_error 	= constrain(x_rate_error, -1000, 1000);
 			//nav_lon			= g.pid_nav_lon.get_pid(x_rate_error, dTnav);
+			p_nav_rate		= g.pid_nav_lon.get_p(x_rate_error);
+			i_nav_rate		= g.pid_nav_lon.get_i(x_rate_error, dTnav);
+			d_nav_rate		= g.pid_nav_lon.get_d(x_rate_error, dTnav);
+			nav_lon			= p_nav_rate + i_nav_rate + d_nav_rate;
+			nav_lon			= constrain(nav_lon, -3000, 3000);
 
-			p_nav_rate			= g.pid_nav_lon.get_p(x_rate_error);
-			i_nav_rate			= g.pid_nav_lon.get_i(x_rate_error, dTnav);
-			d_nav_rate			= g.pid_nav_lon.get_d(x_rate_error, dTnav);
-			d_nav_rate			= constrain(d_loiter_rate, -2000, 2000);
-
-			if (Math.abs(x_actual_speed) < 50)
-				d_nav_rate = 0;
-
-			output					= p_nav_rate + i_nav_rate + d_nav_rate;
-
-			nav_lon			= constrain(output, -3000, 3000);
+			// North / South
+			//y_rate_error 	= (Math.sin(temp) * max_speed) - y_actual_speed; // 413
+			//y_rate_error 	= constrain(y_rate_error, -1000, 1000);	// added a rate error limit to keep pitching down to a minimum
+			//nav_lat			= g.pid_nav_lat.get_pid(y_rate_error, dTnav);
+			//nav_lat			= constrain(nav_lat, -3000, 3000);
 
 			// copy over I term to Loiter_Rate
 			g.pid_loiter_rate_lon.set_integrator(g.pid_nav_lon.get_integrator());
-
+			//g.pid_loiter_rate_lat.set_integrator(g.pid_nav_lat.get_integrator());
 		}
 
 		public function update_trig():void
@@ -3348,12 +3399,18 @@
 				climb_rate_actual 	= baro_rate;
 			}
 
+			// cosmetic
+			current_loc.alt = Math.floor(current_loc.alt);
+
 			// update the target altitude
 			next_WP.alt = get_new_altitude();
 			//trace("next_WP.alt", next_WP.alt);
 
 			// calc error
 			climb_rate_error = (climb_rate_actual - climb_rate) / 5;
+
+			if(g.inertia_checkbox.getSelected())
+				z_error_correction();
 		}
 
 		public function update_altitude_est():void
@@ -3394,21 +3451,30 @@
 			// initialise last_longitude
 			if(last_longitude == 0){
 				last_longitude = g_gps.longitude;
-				g_gps.long_est = g_gps.longitude;
+				//g_gps.long_est = g_gps.longitude;
 			}
+
 			var tmp:Number = 1.0/dTnav;
 
-			//if(g.gps_checkbox.getSelected() == false){
-				x_actual_speed = lon_filter.apply((g_gps.longitude - last_longitude) * tmp);
-				g_gps.long_est = g_gps.longitude;
+			x_actual_speed = (g_gps.longitude - last_longitude) * tmp;
 
-				//g_gps.long_est = g_gps.longitude + x_actual_speed * 0;
-					//if(limit < 100)
-					//	trace(copter.loc.lng, g_gps.longitude, g_gps.long_est);
 
-				last_longitude = g_gps.longitude;
+			if(g.lead_filter_checkbox.getSelected()){
+				current_loc.lng = xLeadFilter.get_position(g_gps.longitude, x_actual_speed, dTnav);
+			}else{
+				current_loc.lng = g_gps.longitude;
+			}
 
-			//}else{
+			//trace(copter.position.x - current_loc.lng)
+
+			//g_gps.long_est = g_gps.longitude + x_actual_speed * 0;
+				//if(limit < 100)
+				//	trace(copter.loc.lng, g_gps.longitude, g_gps.long_est);
+
+			last_longitude = g_gps.longitude;
+
+			if(g.inertia_checkbox.getSelected())
+				xy_error_correction();
 
 			/*
 				// Ryan Beall's forward estimator:
@@ -3428,7 +3494,102 @@
 				//}
 				//trace(speed_new);
 				*/
+		}
+
+
+		public function calc_inertia():void
+		{
+			accels_rotated = ahrs.accel.clone();
+
+			accels_rotated.x += accels_offset.x;
+			//accels_rotated.y += accels_offset.y;
+			accels_rotated.z -= accels_offset.z;
+
+			accels_velocity.x += accels_rotated.x * G_Dt * 100;
+			accels_velocity.z -= accels_rotated.z * G_Dt * 100; // going up = negative accel.z
+
+			accels_position.x += accels_velocity.x * G_Dt;
+			accels_position.z += accels_velocity.z * G_Dt;
+		}
+
+		public function xy_error_correction():void
+		{
+			// Calculate speed error
+			// ---------------------
+			speed_error.x 		= x_actual_speed - accels_velocity.x;
+
+			// correct integrated velocity by speed_error
+			// this number must be small or we will bring back sensor latency
+			// -------------------------------------------
+			accels_velocity.x	+= speed_error.x * g.speed_correction_x;
+
+			// Error correct the accels to deal with calibration, drift and noise
+			// ------------------------------------------------------------------
+			accels_position.x	 -= accels_position.x * g.loiter_vel_correction; // OK
+
+			// update our accel offsets
+			// -------------------------
+			accels_offset.x		 -= accels_position.x * g.loiter_offset_correction;
+		}
+
+		public function z_error_correction():void
+		{
+			// Calculate speed error
+			// ---------------------
+			speed_error.z 		= climb_rate - accels_velocity.z;
+
+			// correct integrated velocity by speed_error
+			// this number must be small or we will bring back sensor latency
+			// -------------------------------------------
+			accels_velocity.z	+= speed_error.z * g.speed_correction_z; 	// OK
+
+			// ------------------------------------------------------------------
+			accels_position.z	 -= accels_position.z * g.alt_vel_correction; // OK
+
+			// update our accel offsets
+			// -------------------------
+			accels_offset.z		-= accels_position.z * g.alt_offset_correction;
+		}
+
+		public function calibrate_accels():void
+		{
+			// sets accels_velocity to 0,0,0
+			zero_accels();
+
+			accels_offset.x = 0;
+			accels_offset.y = 0;
+			accels_offset.z = 0;
+			var i:int;
+
+			//for (i = 0; i < 200; i++){
+			//	delay(10);
+			//	read_AHRS();
 			//}
+
+			//for (i = 0; i < 100; i++){
+				//delay(10);
+				//read_AHRS();
+				calc_inertia();
+			//}
+
+			accels_velocity.x /= 100;
+			accels_velocity.z /= 100;
+			accels_velocity.y /= 100;
+
+			accels_offset = accels_velocity.clone();
+			zero_accels();
+			calc_inertia();
+		}
+
+		public function zero_accels():void
+		{
+			accels_rotated.x 	= 0;
+			accels_rotated.y 	= 0;
+			accels_rotated.z 	= 0;
+
+			accels_velocity.x 	= 0;
+			accels_velocity.y 	= 0;
+			accels_velocity.z 	= 0;
 		}
 
 		// distance is returned in cm
@@ -3592,6 +3753,10 @@
 				g.rc_3.control_in = Math.min(g.rc_3.control_in, MAXIMUM_THROTTLE);
 
 			}
+
+			// override user input
+			//g.rc_1.control_in = user.get_roll();
+
 			throttle_failsafe(g.rc_3.radio_in);
 		}
 
@@ -3747,7 +3912,7 @@
 		private function Log_Write_Nav_Tuning():void
 		{
 			//			  wp_distance, (nav_bearing/100), long_error, lat_error, nav_lon, nav_lat, x_actual_speed, y_actual_speed, g.pid_nav_lon.get_integrator(), g.pid_nav_lat.get_integrator()
-			//trace("NTUN", wp_distance, (nav_bearing/100), long_error, 0, nav_lon, 0, x_actual_speed, 0, g.pid_loiter_rate_lon.get_integrator());
+			trace("NTUN", wp_distance, (nav_bearing/100), long_error, 0, nav_lon, 0, x_actual_speed, 0, g.pid_loiter_rate_lon.get_integrator());
 		}
 
 		private function Log_Write_Control_Tuning():void
@@ -3758,7 +3923,10 @@
 		{
 			//trace("ATT", g.rc_1.control_in, ahrs.roll_sensor);
 		}
-
+		private function Log_Write_GPS():void
+		{
+			trace("GPS, 0, 0, " + 38.5805860 +", "+ (-90.5945080 + current_loc.lng/10000000) +", "+ current_loc.alt/100 +", "+ current_loc.alt/100 +", "+ x_actual_speed +", "+ target_bearing);
+		}
 
 		// ----------------------------------------
 		// System.pde
@@ -3876,8 +4044,19 @@
 				motors.auto_armed = true;
 			}
 
-			// called to calculate gain for alt hold
-			update_throttle_cruise();
+
+			if(g.throttle_cruise == g.THROTTLE_CRUISE){
+				// are we using the default cruise value?
+				// are we moving from manual throttle to auto_throttle?
+				if((control_mode > ACRO) && (g.rc_3.control_in > MINIMUM_THROTTLE)){
+					//g.throttle_cruise.set_and_save(g.rc_3.control_in);
+					g.throttle_cruise = g.rc_3.control_in;
+					reset_throttle_I();
+				}
+			}else{
+				// called to calculate gain for alt hold
+				update_throttle_cruise();
+			}
 
 			if(roll_pitch_mode <= ROLL_PITCH_ACRO){
 				// We are under manual attitude control
@@ -3966,6 +4145,7 @@
 			update_arm_label();
 			init_disarm_motors();
 			init_sim();
+			trace("break");
 		}
 
 		private function startSIM():void
@@ -3987,17 +4167,23 @@
 			gains_button.setLabel("Show Gains");
 			sky.draw();
 			//motors.armed = true;
-			init_arm_motors();
-			update_arm_label();
-
 		}
 
 		private function init_sim():void
 		{
-			iteration = 0;
-			elapsed = 0;
+			copter.init();
+			baro.init();
+			ahrs.init();
+			user.init();
 
-			copter.setThrottleCruise(g.throttle_cruise);
+			copter.windGenerator.resetWind();
+
+			init_arm_motors();
+			update_arm_label();
+
+
+			copter.setThrottleCruise(g.THROTTLE_CRUISE);
+			g.throttle_cruise 	= g.THROTTLE_CRUISE+1; // prevent init issue
 			copter.velocity.x	= g.start_speed_BI.getNumber();
 			copter.velocity.z	= g.start_climb_rate_BI.getNumber();
 			copter.position.x 	= g.start_position_BI.getNumber();
@@ -4009,15 +4195,140 @@
 			copter.loc.alt 		= copter.position.z;
 			current_loc.lng		= copter.loc.lng;
 			current_loc.alt		= copter.loc.alt;
-			copter.windGenerator.resetWind();
+			old_altitude		= copter.loc.alt;
+			old_sonar_alt		= copter.loc.alt;
+			old_baro_alt		= copter.loc.alt;
 
+			iteration 						= 0;
+			elapsed							= 0;
+			medium_loop_counter				= 0;
+			fifty_toggle					= false;
+			medium_loopCounter				= 0;
+			slow_loopCounter				= 0;
+			superslow_loopCounter			= 0;
+			auto_disarming_counter			= 0;
+			counter_one_herz				= 0;
+
+			desired_speed					= 0;
+			x_actual_speed					= 0;
+			x_target_speed					= 0;
+			p_loiter_rate					= 0;
+			i_loiter_rate					= 0;
+			d_loiter_rate					= 0;
+			p_nav_rate						= 0;
+			i_nav_rate						= 0;
+			d_nav_rate						= 0;
+			nav_lon							= 0;
+			nav_roll						= 0;
+			x_rate_error					= 0;
+			last_longitude					= 0;
+			nav_ok							= false
+			auto_roll						= 0;
+			slow_wp							= false;
+			loiter_timer					= 0;
+			wp_control						= 0;
+			wp_verify_byte					= 0;
+			loiter_override					= false
+			crosstrack_error				= 0;
+			long_error						= 0;
+			baro_alt						= 0;
+			baro_rate						= 0;
+			sonar_rate						= 0;
+			sonar_alt						= 0;
+			old_sonar_alt					= 0;
+			old_baro_alt					= 0;
+			wp_distance						= 0;
+			home_distance					= 0;
+			home_to_copter_bearing			= 0;
+			target_bearing					= 0;
+			old_target_bearing				= 0;
+			original_target_bearing			= 0;
+			nav_bearing						= 0;
+			jump							= -10;
+			command_cond_index				= 0;
+			prev_nav_index					= 0;
+			command_nav_index				= 0;
+			condition_value					= 0;
+			condition_start					= 0;
+			nav_yaw							= 0;
+			auto_yaw						= 0;
+			yaw_tracking 					= 1;
+			command_yaw_start				= 0;
+			command_yaw_start_time			= 0;
+			command_yaw_time				= 0;
+			command_yaw_end					= 0;
+			command_yaw_delta				= 0;
+			command_yaw_speed				= 0;
+			command_yaw_dir					= 0;
+			command_yaw_relative			= 0;
+			cos_roll_x						= 0;
+			cos_pitch_x						= 0;
+
+			p_stab							= 0;
+			i_stab							= 0;
+			p_stab_rate						= 0;
+			i_stab_rate						= 0;
+			d_stab_rate						= 0;
+			roll_rate_error					= 0;
+			roll_last_rate					= 0;
+			roll_servo_out					= 0;
+			roll_scale_d					= 0;
+			rate_d_dampener					= 0;
+			control_roll					= 0;
+			roll_last_rate					= 0;
+			old_target_bearing 				= 0;
+			speed_old						= 0;
+
+			climb_rate						= 0;
+			climb_rate_actual				= 0;
+			climb_rate_error				= 0;
+			landing_boost					= 0;
+			d_stab_rate						= 0;
+			home_distance					= 0;
+			p_loiter_rate					= 0;
+			i_loiter_rate					= 0;
+			d_loiter_rate					= 0;
+			angle_boost						= 0;
+			manual_boost					= 0;
+			nav_throttle					= 0;
+			z_target_speed					= 0;
+			i_hold							= 0;
+			p_alt_rate						= 0;
+			i_alt_rate						= 0;
+			d_alt_rate						= 0;
+			z_rate_error					= 0;
+
+			last_error						= 0;
+			throttle						= 0;
+			err								= 0;
+			altitude_error					= 0;
+			old_altitude					= 0;
+			old_alt							= 0;
+			//target						= 500;
+			throttle_min					= 0;
+			reset_throttle_flag				= false;
+
+			climb_rate						= 0;
+			climb_rate_actual				= 0;
+			climb_rate_error				= 0;
+			landing_boost					= 0;
+			land_complete					= false;
+			ground_detector					= 0;
+			accels_velocity.x				= 0;
+			accels_velocity.y				= 0;
+			accels_velocity.z				= 0;
+			accels_offset.x					= 0;
+			accels_offset.y					= 0;
+			accels_offset.z					= 0;
+			accels_position.x				= 0;
+			accels_position.y				= 0;
+			accels_position.z				= 0;
+
+			// call after copter location is inited
+			g_gps.init();
 
 			reset_I_all();
 			reset_nav_params();
-			baro.init();
-			ahrs.init();
-			g_gps.init();
-			copter.roll_target 	= nav_lon = 0;
 			ahrs.roll_sensor	= g.start_angle_BI.getNumber();
 			copter.rotation 	= ahrs.roll_sensor;
 
@@ -4026,6 +4337,11 @@
 			takeoff_complete	= false;
 			failsafeCounter		= 0;
 			radio_failure 		= false;
+
+			// do this one time before we begin
+			update_sim_radio();
+			read_radio();
+			g.rc_3.servo_out 	= g.rc_3.control_in;
 
 			ahrs.roll_speed.x	= g.start_rotation_BI.getNumber();
 
@@ -4036,14 +4352,15 @@
 			var nwp = new Location();
 			nwp.lng = g.target_distance_BI.getNumber();
 			nwp.alt = g.target_altitude_BI.getNumber();
+			//trace("init set_mode");
 			set_mode(modeMenu.getSelectedIndex());
+			//trace("set_Target_WP",nwp.lng)
 			set_next_WP(nwp);
+			//trace("did set_Target_WP",nwp.lng)
 
 			// hack to make the SIM go right into Land
 			if(control_mode == LAND)
 				do_land();
-
-
 			if(g.wind_checkbox.getSelected()){
 				copter.windGenerator.setSpeed(g.wind_low_BI.getNumber(), g.wind_high_BI.getNumber());
 				copter.windGenerator.setPeriod(g.wind_period_BI.getNumber()*1000);
@@ -4052,28 +4369,29 @@
 			}
 
 			lon_filter 				= new AverageFilter(g.speed_filter_size);
+			last_longitude 			= current_loc.lng;
 
 			// radio
 			init_rc_in();
 			init_rc_out();
 			default_dead_zones();
 			// sets throttle to be at hovering setpoint
-			rc_throttle.knob.x = 6;
+			rc_throttle.knob.x = 0;
 
 			// setup a fake AP misison
 			var loc:Location = new Location();
 			loc.id = 16;
 
-			loc.lng = -1000;
-			loc.alt = 500;
+			loc.lng = -5000;
+			loc.alt = 360;
 			set_cmd_with_index(loc, 1);
 
 			loc.lng = 0;
-			loc.alt = 500;
+			loc.alt = 360;
 			set_cmd_with_index(loc, 2);
 
 			loc.lng = 1000;
-			loc.alt = 500;
+			loc.alt = 1200;
 			set_cmd_with_index(loc, 3);
 
 			loc.lng = 0;
@@ -4083,6 +4401,7 @@
 			loc.id = 21;
 			loc.alt = 0;
 			set_cmd_with_index(loc, 5);
+			trace("finish init",nwp.lng);
 		}
 
 
@@ -4123,7 +4442,7 @@
 
 		private function keyUpHandler(k:KeyboardEvent):void
 		{
-			//trace(k.keyCode);
+			trace(k.keyCode);
 
 			if(k.shiftKey){
 				switch(k.keyCode){
@@ -4183,6 +4502,9 @@
 			}
 
 			switch(k.keyCode){
+				case 66:  // b
+					copter.jump();
+					break;
 
 				case 84:  // 1 for
 					test_radio_rage_output();
@@ -4205,12 +4527,12 @@
 					trace("RC Failure");
 					break;
 
-				case 83: // h for hover
+				case 83: // s for start/stop
 					simHandler(null);
 					break;
 
 				case 72: // h for hover
-					rc_throttle.knob.x = 6;
+					rc_throttle.knob.x = 0;
 					break;
 
 				case 76: // l for loop
@@ -4385,6 +4707,11 @@
 					val = i_hold;
 				break;
 
+
+				case "z_rate_error":
+					val = z_rate_error;
+				break;
+
 				case "alt_rate_p":
 					val = p_alt_rate;
 				break;
@@ -4407,9 +4734,25 @@
 					_scale = 100;
 				break;
 
+				case "vel_x":
+					val = accels_velocity.x
+					//_scale = 1;
+				break;
+
+
 				case "accel_z":
 					val = ahrs.accel.z;
 					_scale = 100;
+				break;
+
+				case "vel_z":
+					val = accels_velocity.z
+					//_scale = 1;
+				break;
+
+				case "z_boost":
+					val = z_boost;
+					//_scale = 100;
 				break;
 
 
@@ -4512,19 +4855,6 @@
 			trace("cmd#: " + index + " id:" + cmd.id + " op:" + cmd.options + " p1:" + cmd.p1 + " p2:" + cmd.alt + " p3:" + cmd.lat + " p4:" + cmd.lng);
 		}
 
-		// call at 50hz
-		public function read_gps():void
-		{
-			if((gps_counter++ % 13) == 0){
-				g_gps.read()
-			}
-
-			// overflow the GPS counter
-			if(gps_counter >= 50){
-				gps_counter = 0;
-			}
-		}
-
 		public static function formatTime(time:Number):String
 		{
 			time /=1000;
@@ -4611,6 +4941,10 @@
 		public function millis():int
 		{
 			return elapsed;
+		}
+		public function delay(n:int)
+		{
+			elapsed += n;
 		}
 	}
 }

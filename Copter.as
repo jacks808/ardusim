@@ -34,17 +34,6 @@
 		public var apm_rc					:APM_RC;
 		public var motor_filter_1			:AverageFilter;
 		public var motor_filter_0			:AverageFilter;
-
-		//public var speed					:int = 0;
-		public var gravity					:Number = 981;
-		public var thrust_scale				:Number = 0.4;
-		//public var friction					:Number = .0010; // affects aplitude of oscillations
-		public var ground_speed				:Number = 0;
-		public var roll_target				:Number	= 0;
-		public var throttle					:Number	= 500;
-		public var altitude_rate			:Number = 9;
-		public var omega_x					:Number = 0;
-
 		public var drag						:Vector3D;		//
 		public var airspeed					:Vector3D;		//
 		public var thrust					:Vector3D;		//
@@ -53,33 +42,41 @@
 		public var velocity_old				:Vector3D;
 		public var wind						:Vector3D;			//
 		public var rot_thrust				:Vector3D;			//
-		public var angle_boost				:Number;
 		public var windGenerator			:Wind;			//
-		public var rotation_bias			:Number = 1;
+
+		public var gravity					:Number 	= 981;
+		public var thrust_scale				:Number 	= 0.4;
+		public var ground_speed				:Number 	= 0;
+		public var throttle					:Number		= 500;
+		public var rotation_bias			:Number 	= 1;
+		private var _jump_z					:Number 	= 0;
 
 		public function Copter():void
 		{
 			loc = new Location();
 			addEventListener(Event.ADDED_TO_STAGE, addedToStage);
-
-			drag 		= new Vector3D(0,0,0);
-			airspeed 	= new Vector3D(0,0,0);
-			thrust 		= new Vector3D(0,0,0);
-			wind 		= new Vector3D(0,0,0);
-			position 	= new Vector3D(0,0,0);
-			velocity 	= new Vector3D(0,0,0);
-			rot_thrust	= new Vector3D(0,0,0);
-			velocity_old = new Vector3D(0,0,0);
 			windGenerator = new Wind();
 			g = Parameters.getInstance();
-			setThrottleCruise(throttle);
-
-
 	    }
 
 	    public function addedToStage(even:Event) : void
 		{
 			//g = Parameters.getInstance();
+		}
+
+	    public function init():void
+		{
+			drag 			= new Vector3D(0,0,0);
+			airspeed 		= new Vector3D(0,0,0);
+			thrust 			= new Vector3D(0,0,0);
+			wind 			= new Vector3D(0,0,0);
+			position 		= new Vector3D(0,0,0);
+			velocity 		= new Vector3D(0,0,0);
+			rot_thrust		= new Vector3D(0,0,0);
+			velocity_old 	= new Vector3D(0,0,0);
+			setThrottleCruise(throttle);
+			ground_speed 	= 0;
+
 		}
 
 		public function setThrottleCruise(c:Number):void
@@ -92,6 +89,15 @@
 
 			motor_filter_0	= new AverageFilter(g.esc_delay);
 			motor_filter_1	= new AverageFilter(g.esc_delay);
+
+			motor_filter_0.force_sample(c);
+			motor_filter_1.force_sample(c);
+		}
+
+		public function jump():void
+		{
+			_jump_z = 300;
+
 		}
 
 		public function update(dt:Number):void
@@ -132,6 +138,12 @@
 
 			thrust.x 	= Math.sin(radiansx100(ahrs.roll_sensor)) * _thrust;
 			thrust.z 	= Math.cos(radiansx100(ahrs.roll_sensor)) * _thrust;
+			var thrust_fix = thrust.z * .1;
+
+			thrust.z -= thrust_fix;
+			//thrust.x += thrust_fix /2;
+
+			//thrust.x *= 2.4;
 
 			// Add in Drag
 			if(airspeed.x >= 0)
@@ -148,8 +160,19 @@
 			velocity.z  	+= (thrust.z * dt) / g.mass;
 			velocity.z 		-= gravity * dt;
 
+
+			velocity.z		+= _jump_z * dt;
+
+			_jump_z 		*= .95;
+
+			// add some lift from airspeed
+			//velocity.z		+= airspeed.x * dt * .1;
+
 			ahrs.accel.x 	= (velocity.x - velocity_old.x) / (dt * 100);
-			ahrs.accel.z 	= (velocity.z - velocity_old.z) / (dt * 100);
+			ahrs.accel.z 	= -(velocity.z - velocity_old.z) / (dt * 100);
+
+			ahrs.accel.x	+= g.accel_bias_x;
+			ahrs.accel.z	+= g.accel_bias_z;
 
 			//trace(velocity.z, (velocity.z - velocity_old.z) * 100, ahrs.accel.z* 100);
 

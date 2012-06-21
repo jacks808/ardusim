@@ -33,12 +33,15 @@ package com {
 		// ---------------------------------------------
 		// Sim Details controls
 		// ---------------------------------------------
-		public var sim_iterations			:int 		= 50000;
-		public var windSpeedMin				:Number 	= 25;
-		public var windSpeedMax				:Number 	= 100;
+		public var sim_iterations			:int 		= 99999;
+		public var sim_speed				:int 		= 1;
+
+		public var windSpeedMin				:Number 	= 150;
+		public var windSpeedMax				:Number 	= 200;
 		public var windPeriod				:Number 	= 30000;
 		public var airDensity				:Number 	= 1.184;
-		public var crossSection				:Number 	= 0.015;
+		//public var crossSection				:Number 	= 0.015;
+		public var crossSection				:Number 	= 0.008;
 		public var dragCE					:Number 	= 0.20;
 		public var speed_filter_size		:Number 	= 2;
 		public var motor_kv					:Number 	= 1000;
@@ -74,17 +77,16 @@ package com {
 		public var wind_period_BI			:BasicInput;
 
 		public var wind_checkbox			:QuickCheckBox;
-		public var gps_checkbox				:QuickCheckBox;
 		public var fastPlot_checkbox		:QuickCheckBox;
 		public var axis_enabled_checkbox	:QuickCheckBox;
 		public var sonar_checkbox			:QuickCheckBox;
 		public var rtl_land_checkbox		:QuickCheckBox;
+		public var lead_filter_checkbox		:QuickCheckBox;
 
 		public var test_checkbox			:QuickCheckBox;
 
 		public var NTUN_checkbox			:QuickCheckBox;
 		public var CTUN_checkbox			:QuickCheckBox;
-		//public var gps_checkbox			:QuickCheckBox;
 
 		// stability
 		public var stab_roll_P_BI			:BasicInput;
@@ -126,7 +128,6 @@ package com {
 		public var alt_rate_D_BI			:BasicInput;
 		public var throttle_error_BI		:BasicInput;
 
-		public var alt_D_BI					:BasicInput;
 
 		public var test						:Boolean = false;
 
@@ -168,26 +169,61 @@ package com {
 		// -----------------------------------------
 		public var pi_alt_hold				:PID
 		public var pid_throttle				:PID
-		private var alt_hold_p				:Number = 0.5;
-		private var alt_hold_i				:Number = 0.007;
-		private var alt_hold_imax			:Number = 300;
-		private var throttle_rate_p			:Number = 0.25;
-		private var throttle_rate_i			:Number = 0.0;
-		private var throttle_rate_d			:Number = 0.02;
-		private var throttle_rate_imax		:Number = 300;
-		public var alt_D					:Number = 15;
+		/*
+		// inertia gains
 
+		private var alt_hold_p				:Number = 0.5;
+		private var alt_hold_i				:Number = 0		// 0.007;
+		private var alt_hold_imax			:Number = 300;
+		private var throttle_rate_p			:Number = 3.0 	//0.25;
+		private var throttle_rate_i			:Number = 0.5;
+		private var throttle_rate_d			:Number = 0.0;
+		private var throttle_rate_imax		:Number = 300;
+		*/
+
+		//reg gains
+		private var alt_hold_p				:Number = 0.8;
+		private var alt_hold_i				:Number = 0.007
+		private var alt_hold_imax			:Number = 300;
+		private var throttle_rate_p			:Number = .35
+		private var throttle_rate_i			:Number = 0.0;
+		private var throttle_rate_d			:Number = 0.0;
+		private var throttle_rate_imax		:Number = 300;
+
+		// -----------------------------------------
+		// Inertial control
+		// -----------------------------------------
+		public var speed_correction_x		:Number = 0.020;
+		public var speed_correction_z		:Number = 0.0350;
+		public var loiter_offset_correction	:Number = 0.000001; //0.000003
+		public var loiter_vel_correction	:Number = 0.03;.007
+		public var accel_bias_x				:Number = .2;
+
+		public var alt_offset_correction	:Number = 0.000003;
+		public var alt_vel_correction		:Number = 0.006;
+		public var accel_bias_z				:Number = .2;
 
 		// -----------------------------------------
 		// Loiter
 		// -----------------------------------------
 		public var pi_loiter_lon			:PID
 		public var pid_loiter_rate_lon		:PID
-		private var loiter_p				:Number = 0.4; // 0
-		private var loiter_rate_p			:Number = 3.0; // 1.0
-		private var loiter_rate_i			:Number = 0.08; // .05
-		private var loiter_rate_d			:Number = 0.45; // 3.8
+		/*
+		// inertia gains
+		private var loiter_p				:Number = 0.5; // 0
+		private var loiter_rate_p			:Number = 12; // 1.0
+		private var loiter_rate_i			:Number = 1.1; // .05
+		private var loiter_rate_d			:Number = 0.0; // 3.8
 		private var loiter_rate_imax		:Number = 3000; // .05
+		*/
+
+		// reg gains
+		private var loiter_p				:Number = 0.2; // 0
+		private var loiter_rate_p			:Number = 2.4; // 1.0
+		private var loiter_rate_i			:Number = 0.08; // .05
+		private var loiter_rate_d			:Number = 0.0; // 3.8
+		private var loiter_rate_imax		:Number = 3000; // .05
+
 
 		// -----------------------------------------
 		// NAV, RTL
@@ -209,18 +245,20 @@ package com {
 		public var command_nav_index		:int = 0;
 		public var waypoint_radius			:int = 100;
 		public var loiter_radius			:int = 10;
-		public var waypoint_speed_max		:Number = 600;
+		public var waypoint_speed_max		:Number = 450;
 		public var crosstrack_gain			:Number = 1.0;
 		public var auto_land_timeout		:Number = 5000;// milliseconds
 
 		// Throttle
 		//
-		public var throttle_min				:int 		= 0
-		public var throttle_max				:int 		= 1000
+		public var throttle_min				:int 		= 0;
+		public var throttle_max				:int 		= 1000;
 		public var throttle_fs_enabled		:Boolean 	= true;
-		public var throttle_fs_action		:int 		= 2
-		public var throttle_fs_value		:int 		= 975
-		public var throttle_cruise			:Number 	= 500;
+		public var throttle_fs_action		:int 		= 2;
+		public var throttle_fs_value		:int 		= 975;
+		public const THROTTLE_CRUISE		:int		= 495;
+
+		public var throttle_cruise			:Number 	= 495;
 		public var throttle_cruise_e		:Number 	= 0;
 
 
@@ -237,7 +275,7 @@ package com {
 		// Misc
 		//
 		public var ch7_option				:int		= 7; // CH7_SAVE_WP
-		public var auto_slew_rate			:Number = 30;
+		public var auto_slew_rate			:Number 	= 30;
 
 		// RC channels
 		public var rc_1						:RC_Channel;
@@ -307,7 +345,6 @@ package com {
 
 		public function addedToStage(event:Event):void {
 			originalX = this.x;
-			gps_checkbox.setLabel("GPS Estimator");
 			wind_checkbox.setLabel("Enable Wind");
 			fastPlot_checkbox.setLabel("Fast plot");
 
@@ -318,13 +355,19 @@ package com {
 
 			NTUN_checkbox.setLabel("Log NTUN");
 			CTUN_checkbox.setLabel("Log CTUN");
-			test_checkbox.setLabel("Test Option");
-
+			GPS_checkbox.setLabel("Log GPS");
+			ATT_checkbox.setLabel("Log ATT");
+			test_checkbox.setLabel("A/B Test Option");
+			lead_filter_checkbox.setLabel("GPS Lead Filter");
+			inertia_checkbox.setLabel("Inertial Control");
 			initGains();
 		}
 
 		private function initGains():void
 		{
+			sim_speed_BI.setNumber(sim_speed);
+			lead_filter_checkbox.setSelected(true);
+
 			// stabilize
 			stab_roll_P_BI.setNumber(stabilize_p);
 			stab_roll_I_BI.setNumber(stabilize_i);
@@ -346,6 +389,16 @@ package com {
 
 			// for testing alternatives
 			test_checkbox.setSelected(test);
+
+			speed_correction_x_BI.setNumber(speed_correction_x);
+			loiter_offset_correction_BI.setNumber(loiter_offset_correction);
+			loiter_vel_correction_BI.setNumber(loiter_vel_correction);
+			accel_bias_x_BI.setNumber(accel_bias_x);
+
+			speed_correction_z_BI.setNumber(speed_correction_z);
+			alt_offset_correction_BI.setNumber(alt_offset_correction);
+			alt_vel_correction_BI.setNumber(alt_vel_correction);
+			accel_bias_z_BI.setNumber(accel_bias_z);
 
 			// loiter
 			loiter_hold_P_BI.setNumber(loiter_p);
@@ -372,7 +425,6 @@ package com {
 			alt_rate_Imax_BI.setNumber(throttle_rate_imax);
 			alt_rate_D_BI.setNumber(throttle_rate_d);
 			throttle_error_BI.setNumber(throttle_cruise_e);
-			alt_D_BI.setNumber(alt_D);
 
 			// SIM
 			drag_BI.setNumber(dragCE);
@@ -402,6 +454,8 @@ package com {
 
 		public function updateGains():void
 		{
+			sim_speed					= sim_speed_BI.getNumber();
+
 			// stabilize
 			pi_stabilize_roll._kp		= stab_roll_P_BI.getNumber();
 			pi_stabilize_roll._ki		= stab_roll_I_BI.getNumber();
@@ -423,6 +477,17 @@ package com {
 
 			// for testing alternatives
 			test						= test_checkbox.getSelected();
+
+			speed_correction_x			= speed_correction_x_BI.getNumber();
+			loiter_offset_correction	= loiter_offset_correction_BI.getNumber();
+			loiter_vel_correction		= loiter_vel_correction_BI.getNumber();
+			accel_bias_x				= accel_bias_x_BI.getNumber();
+
+			speed_correction_z			= speed_correction_z_BI.getNumber();
+			alt_offset_correction		= alt_offset_correction_BI.getNumber();
+			alt_vel_correction			= alt_vel_correction_BI.getNumber();
+			accel_bias_z				= accel_bias_z_BI.getNumber();
+
 
 			// loiter
 			pi_loiter_lon._kp			= loiter_hold_P_BI.getNumber();
@@ -448,8 +513,6 @@ package com {
 			pid_throttle._imax 			= alt_rate_Imax_BI.getNumber();
 			pid_throttle._kd 			= alt_rate_D_BI.getNumber();
 			throttle_cruise_e 			= throttle_error_BI.getNumber();
-
-			alt_D 						= alt_D_BI.getNumber();
 
 			// SIM
 			dragCE						= drag_BI.getNumber();

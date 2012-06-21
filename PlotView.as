@@ -88,8 +88,8 @@ package com {
 
 		public function setScale(x:Number, y:Number):void
 		{
-			x = Math.max(x,  1);
-			y = Math.max(y, .01);
+			x = Math.max(x,  .001);
+			y = Math.max(y, .001);
 
 			dataScaleX = x;
 			dataScaleY = y
