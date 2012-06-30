@@ -39,15 +39,19 @@ package com {
 		public var windSpeedMin				:Number 	= 150;
 		public var windSpeedMax				:Number 	= 200;
 		public var windPeriod				:Number 	= 30000;
+		public var windDir					:Number 	= 45;
+
 		public var airDensity				:Number 	= 1.184;
 		//public var crossSection				:Number 	= 0.015;
-		public var crossSection				:Number 	= 0.008;
+		public var crossSection				:Number 	= 0.005;
 		public var dragCE					:Number 	= 0.20;
 		public var speed_filter_size		:Number 	= 2;
 		public var motor_kv					:Number 	= 1000;
 		public var moment					:Number 	= 3;
 		public var mass						:Number 	= 500;
 		public var esc_delay				:int 		= 12;
+		public var airspeed_fix				:Number 	= 0; // 0.0054;
+
 
 		// -----------------------------------------
 		// SIM
@@ -82,6 +86,7 @@ package com {
 		public var sonar_checkbox			:QuickCheckBox;
 		public var rtl_land_checkbox		:QuickCheckBox;
 		public var lead_filter_checkbox		:QuickCheckBox;
+		public var simple_checkbox			:QuickCheckBox;
 
 		public var test_checkbox			:QuickCheckBox;
 
@@ -151,7 +156,13 @@ package com {
 		// Stabilize
 		// -----------------------------------------
 		public var pi_stabilize_roll		:PID
+		public var pi_stabilize_pitch		:PID
+		public var pi_stabilize_yaw			:PID
+
 		public var pid_rate_roll			:PID
+		public var pid_rate_pitch			:PID
+		public var pid_rate_yaw				:PID
+
 		private var stabilize_p				:Number = 4.5;
 		private var stabilize_i				:Number = 0.1;
 		private var stabilize_imax			:Number = 4000;
@@ -162,6 +173,16 @@ package com {
 		private var rate_imax				:Number = 500;
 		private var stab_d					:Number = 0.0;
 
+
+		private var stabilize_yaw_p			:Number = 7.0;
+		private var stabilize_yaw_i			:Number = .01;
+		private var stabilize_yaw_imax		:Number = 800;
+
+		private var rate_yaw_p				:Number = 0.13; // .14
+		private var rate_yaw_i				:Number = 0.0;
+		private var rate_yaw_d				:Number = 0.004;  // .002
+		private var rate_yaw_imax			:Number = 5000;
+
 		public var super_simple				:Boolean = false;
 
 		// -----------------------------------------
@@ -169,9 +190,9 @@ package com {
 		// -----------------------------------------
 		public var pi_alt_hold				:PID
 		public var pid_throttle				:PID
+
 		/*
 		// inertia gains
-
 		private var alt_hold_p				:Number = 0.5;
 		private var alt_hold_i				:Number = 0		// 0.007;
 		private var alt_hold_imax			:Number = 300;
@@ -207,7 +228,10 @@ package com {
 		// Loiter
 		// -----------------------------------------
 		public var pi_loiter_lon			:PID
+		public var pi_loiter_lat			:PID
 		public var pid_loiter_rate_lon		:PID
+		public var pid_loiter_rate_lat		:PID
+
 		/*
 		// inertia gains
 		private var loiter_p				:Number = 0.5; // 0
@@ -228,7 +252,8 @@ package com {
 		// -----------------------------------------
 		// NAV, RTL
 		// -----------------------------------------
-		public var pid_nav_lon				:PID
+		public var pid_nav_lon				:PID;
+		public var pid_nav_lat				:PID;
 		private var nav_p					:Number = 3.0;
 		private var nav_i					:Number = 0.20;
 		private var nav_d					:Number = 0.00;
@@ -245,20 +270,20 @@ package com {
 		public var command_nav_index		:int = 0;
 		public var waypoint_radius			:int = 100;
 		public var loiter_radius			:int = 10;
-		public var waypoint_speed_max		:Number = 450;
-		public var crosstrack_gain			:Number = 1.0;
+		public var waypoint_speed_max		:Number = 600;
+		public var crosstrack_gain			:Number = .2;	// XXX SYNC
 		public var auto_land_timeout		:Number = 5000;// milliseconds
 
 		// Throttle
 		//
-		public var throttle_min				:int 		= 0;
+		public var throttle_min				:int 		= 130;
 		public var throttle_max				:int 		= 1000;
 		public var throttle_fs_enabled		:Boolean 	= true;
 		public var throttle_fs_action		:int 		= 2;
 		public var throttle_fs_value		:int 		= 975;
-		public const THROTTLE_CRUISE		:int		= 495;
+		public const THROTTLE_CRUISE		:int		= 551;
 
-		public var throttle_cruise			:Number 	= 495;
+		public var throttle_cruise			:Number 	= 551;
 		public var throttle_cruise_e		:Number 	= 0;
 
 
@@ -274,8 +299,16 @@ package com {
 
 		// Misc
 		//
-		public var ch7_option				:int		= 7; // CH7_SAVE_WP
-		public var auto_slew_rate			:Number 	= 30;
+		//public var ch7_option				:int		= 0; // CH7_DO_NOTHING 0
+		//public var ch7_option				:int		= 1; // CH7_SET_HOVER 1
+		//public var ch7_option				:int		= 2; // CH7_FLIP 2
+		//public var ch7_option				:int		= 3; // CH7_SIMPLE_MODE 3
+		public var ch7_option				:int		= 4; // CH7_RTL 4
+		//public var ch7_option				:int		= 5; // CH7_AUTO_TRIM 5
+		//public var ch7_option				:int		= 6; // CH7_ADC_FILTER 6
+		//public var ch7_option				:int		= 7; // CH7_SAVE_WP 7
+
+		public var auto_slew_rate			:Number 	= 60;
 
 		// RC channels
 		public var rc_1						:RC_Channel;
@@ -299,6 +332,9 @@ package com {
 		public var axis_lock_p				:Number = .02;
 
 
+		public var toy_yaw_rate				:int = 1; // 1 = fast, 2 = med, 3 = slow
+
+
 		public function Parameters():void
 		{
 			if (instance == null)
@@ -319,18 +355,26 @@ package com {
 
 			// Loiter
 			pi_loiter_lon 			= new PID(loiter_p, 0, 0, 3000);				// Raise P to decrease frequency
+			pi_loiter_lat 			= new PID(loiter_p, 0, 0, 3000);				// Raise P to decrease frequency
 			pid_loiter_rate_lon 	= new PID(loiter_rate_p, loiter_rate_i , loiter_rate_d, loiter_rate_imax);
+			pid_loiter_rate_lat 	= new PID(loiter_rate_p, loiter_rate_i , loiter_rate_d, loiter_rate_imax);
 
 			// Alt Hold
 			pi_alt_hold 			= new PID(alt_hold_p, alt_hold_i, 0, 300);
 			pid_throttle 			= new PID(throttle_rate_p, throttle_rate_i, throttle_rate_d, 300);
 
 			// Stabilie
-			pi_stabilize_roll 		= new PID(stabilize_p, stabilize_i, 0, 300);
+			pi_stabilize_roll 		= new PID(stabilize_p, 		stabilize_i, 0, 	stabilize_imax);
+			pi_stabilize_pitch 		= new PID(stabilize_p, 		stabilize_i, 0, 	stabilize_imax);
+			pi_stabilize_yaw 		= new PID(stabilize_yaw_p, 	stabilize_yaw_i, 0, stabilize_yaw_imax);
+
 			pid_rate_roll 			= new PID(rate_p, rate_i, rate_d, rate_imax);
+			pid_rate_pitch 			= new PID(rate_p, rate_i, rate_d, rate_imax);
+			pid_rate_yaw 			= new PID(rate_yaw_p, rate_yaw_i, rate_yaw_d, rate_yaw_imax);
 
 			// nav
 			pid_nav_lon 			= new PID(nav_p, nav_i , nav_d, nav_imax);
+			pid_nav_lat 			= new PID(nav_p, nav_i , nav_d, nav_imax);
 
 			addEventListener(Event.ADDED_TO_STAGE, addedToStage);
 		}
@@ -360,6 +404,7 @@ package com {
 			test_checkbox.setLabel("A/B Test Option");
 			lead_filter_checkbox.setLabel("GPS Lead Filter");
 			inertia_checkbox.setLabel("Inertial Control");
+			simple_checkbox.setLabel("Simple Mode");
 			initGains();
 		}
 
@@ -367,7 +412,9 @@ package com {
 		{
 			sim_speed_BI.setNumber(sim_speed);
 			lead_filter_checkbox.setSelected(true);
+			toy_yaw_rate_BI.setNumber(toy_yaw_rate);
 
+			//auto_slew_rate_BI.setNumber(auto_slew_rate);
 			// stabilize
 			stab_roll_P_BI.setNumber(stabilize_p);
 			stab_roll_I_BI.setNumber(stabilize_i);
@@ -414,6 +461,7 @@ package com {
 			nav_I_BI.setNumber(nav_i);
 			nav_Imax_BI.setNumber(nav_imax);
 			nav_D_BI.setNumber(nav_d);
+			crosstrack_gain_BI.setNumber(crosstrack_gain);
 
 			// alt hold
 			alt_hold_P_BI.setNumber(alt_hold_p);
@@ -440,6 +488,7 @@ package com {
 			wind_low_BI.setNumber(windSpeedMin);
 			wind_high_BI.setNumber(windSpeedMax);
 			wind_period_BI.setNumber(windPeriod/1000);
+			windDir_BI.setNumber(windDir);
 			start_speed_BI.setNumber(0);
 			start_rotation_BI.setNumber(0);
 			start_climb_rate_BI.setNumber(0);
@@ -449,22 +498,34 @@ package com {
 			moment_BI.setNumber(moment);
 			mass_BI.setNumber(mass);
 			esc_delay_BI.setNumber(esc_delay);
-
+			airspeed_fix_BI.setNumber(airspeed_fix);
 		}
 
 		public function updateGains():void
 		{
 			sim_speed					= sim_speed_BI.getNumber();
 
+			//auto_slew_rate				= auto_slew_rate_BI.getNumber();
+			toy_yaw_rate				= toy_yaw_rate_BI.getNumber();
+
 			// stabilize
 			pi_stabilize_roll._kp		= stab_roll_P_BI.getNumber();
 			pi_stabilize_roll._ki		= stab_roll_I_BI.getNumber();
 			pi_stabilize_roll._imax		= stab_roll_Imax_BI.getNumber();
 
+			pi_stabilize_pitch._kp		= stab_roll_P_BI.getNumber();
+			pi_stabilize_pitch._ki		= stab_roll_I_BI.getNumber();
+			pi_stabilize_pitch._imax	= stab_roll_Imax_BI.getNumber();
+
 			pid_rate_roll._kp			= stab_rate_P_BI.getNumber();
 			pid_rate_roll._ki			= stab_rate_I_BI.getNumber();
 			pid_rate_roll._imax			= stab_rate_Imax_BI.getNumber();
 			pid_rate_roll._kd			= stab_rate_D_BI.getNumber();
+
+			pid_rate_pitch._kp			= stab_rate_P_BI.getNumber();
+			pid_rate_pitch._ki			= stab_rate_I_BI.getNumber();
+			pid_rate_pitch._imax		= stab_rate_Imax_BI.getNumber();
+			pid_rate_pitch._kd			= stab_rate_D_BI.getNumber();
 
 			stabilize_d_schedule 		= stabilize_d_schedule_BI.getNumber();
 			stabilize_d 				= stabilize_d_BI.getNumber();
@@ -496,12 +557,24 @@ package com {
 			pid_loiter_rate_lon._imax 	= loiter_rate_Imax_BI.getNumber();
 			pid_loiter_rate_lon._kd 	= loiter_rate_D_BI.getNumber();
 
+			pi_loiter_lat._kp			= loiter_hold_P_BI.getNumber();
+			pid_loiter_rate_lat._kp 	= loiter_rate_P_BI.getNumber();
+			pid_loiter_rate_lat._ki 	= loiter_rate_I_BI.getNumber();
+			pid_loiter_rate_lat._imax 	= loiter_rate_Imax_BI.getNumber();
+			pid_loiter_rate_lat._kd 	= loiter_rate_D_BI.getNumber();
+
 			// nav
 			waypoint_speed_max			= waypoint_speed_max_BI.getNumber();
 			pid_nav_lon._kp 			= nav_P_BI.getNumber();
 			pid_nav_lon._ki 			= nav_I_BI.getNumber();
 			pid_nav_lon._imax 			= nav_Imax_BI.getNumber();
 			pid_nav_lon._kd 			= nav_D_BI.getNumber();
+
+			pid_nav_lat._kp 			= nav_P_BI.getNumber();
+			pid_nav_lat._ki 			= nav_I_BI.getNumber();
+			pid_nav_lat._imax 			= nav_Imax_BI.getNumber();
+			pid_nav_lat._kd 			= nav_D_BI.getNumber();
+			crosstrack_gain				= crosstrack_gain_BI.getNumber();
 
 			// alt hold
 			pi_alt_hold._kp 			= alt_hold_P_BI.getNumber();
@@ -524,6 +597,7 @@ package com {
 			moment						= moment_BI.getNumber();
 			mass						= mass_BI.getNumber();
 			esc_delay					= esc_delay_BI.getNumber();
+			airspeed_fix				= airspeed_fix_BI.getNumber();
 
 			if(moment == 0) moment = 1;
 			if(mass == 0) mass = 1;
