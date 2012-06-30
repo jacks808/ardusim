@@ -9,7 +9,12 @@ package com {
 		public function LeadFilter(){
 		}
 
-		public function get_position(pos:Number, vel:Number, dt:Number):Number
+		public function init():void
+		{
+			last_velocity = 0;
+		}
+
+		public function get_position(pos:Number, vel:Number):Number
 		{
 			vel = (last_velocity + vel) / 2;
 			var new_position:Number  = pos + vel;
