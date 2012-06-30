@@ -27,6 +27,7 @@ package com {
 		public var ghost_XY			:Point;
 		public var frame			:Rectangle;
 		public var copter			:Copter;
+		public var copter_mc		:MovieClip;
 		public var copter_lag		:MovieClip;
 		public var ghost			:MovieClip;
 		public var controller		:Main;
@@ -49,14 +50,14 @@ package com {
 		{
 
 			copter_XY.x 	= frame.width/2 + copter.loc.lng * 1.123;
-			copter.x 		= copter_XY.x % frame.width;
-			if (copter.x < 0)
-				copter.x	+= frame.width;
+			copter_mc.x 	= copter_XY.x % frame.width;
+			if (copter_mc.x < 0)
+				copter_mc.x	+= frame.width;
 
 			copter_XY.y 	= frame.height - copter.loc.alt;
-			copter.y 		= copter_XY.y % frame.height;
-			if (copter.y < 0)
-				copter.y	+= frame.height;
+			copter_mc.y 	= copter_XY.y % frame.height;
+			if (copter_mc.y < 0)
+				copter_mc.y	+= frame.height;
 
 			calc_copter_page();
 
@@ -93,8 +94,12 @@ package com {
 
 			//-----------------------------------------------------------------
 
-			copter.rotation = copter.ahrs.roll_sensor/100;
-			copter_lag.rotation = copter.rotation;
+			//trace("pos", copter.loc.lng, copter.loc.lat);
+
+			//copter.rotation = copter.ahrs.roll_sensor/100;
+			copter_mc.rotation = degrees(Math.asin(copter.angle3D.x));
+
+			copter_lag.rotation = copter_mc.rotation;
 
 			//loc_lng_TF.text = Math.floor(copter.loc.lng) +"cm";
 			//loc_alt_TF.text = Math.floor(copter.loc.alt) +"cm";
@@ -119,16 +124,24 @@ package com {
 				x_page_g--;
 		}
 
-
-
 		public function addedToStage(event:Event):void
 		{
 			_preview.visible 	= false;
-			this.frame.width 	= Math.round(this.width);
-			this.frame.height 	= Math.round(this.height);
+			this.frame.width 	= Math.round(_preview.width);
+			this.frame.height 	= Math.round(_preview.height);
 			scaleX = 1;
 			scaleY = 1;
-			//draw();
 		}
+
+		public function degrees(r:Number):Number
+		{
+			return r * 57.2957795;
+		}
+
+		public function radians(n:Number):Number
+		{
+			return 0.0174532925 * n;
+		}
+
 	}
 }
