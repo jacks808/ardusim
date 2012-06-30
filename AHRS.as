@@ -6,14 +6,14 @@ package com {
 		public var roll_sensor:Number = 0;
 		public var pitch_sensor:Number = 0;
 		public var yaw_sensor:Number = 0;
-		public var roll_speed:Vector3D;
+		public var rotation_speed:Vector3D;
 		public var omega:Vector3D;
 		public var accel:Vector3D;
 
 		public function AHRS() {
-			accel 		= new Vector3D(0,0,0);
-			roll_speed 	= new Vector3D(0,0,0);
-			omega 		= new Vector3D(0,0,0);
+			accel 			= new Vector3D(0,0,0);
+			rotation_speed 	= new Vector3D(0,0,0);
+			omega 			= new Vector3D(0,0,0);
 		}
 
 		public function init() {
@@ -23,9 +23,9 @@ package com {
 			omega.x			= 0;
 			omega.y			= 0;
 			omega.z			= 0;
-			roll_speed.x	= 0;
-			roll_speed.y	= 0;
-			roll_speed.z	= 0;
+			rotation_speed.x	= 0;
+			rotation_speed.y	= 0;
+			rotation_speed.z	= 0;
 			accel.x 		= 0;
 			accel.y 		= 0;
 			accel.z 		= 0;
