@@ -16,6 +16,11 @@ package com {
 			}
 		}
 
+		public function init():void
+		{
+			force_sample(0);
+		}
+
 		public function force_sample(_sample:Number):void
 		{
 			for(var i:int = 0; i < filter_size; i++){
@@ -52,9 +57,6 @@ package com {
 			}
 			return sum/filter_size;
 		}
-
-
-
 
 	}
 }
