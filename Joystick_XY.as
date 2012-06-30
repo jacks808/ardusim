@@ -51,7 +51,6 @@ package com {
 				knob_y.y = Math.max(knob_y.y, -100);
 			}
 
-
 			if (pressed_pad){
 				knob_x.x = mouseX;
 				knob_y.y = mouseY;
