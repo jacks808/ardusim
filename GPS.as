@@ -56,13 +56,6 @@ package com {
 			return bearing * 100;
 		}
 
-		private function get_distance(p1:Point, p2:Point):Number
-		{
-			var dlong:Number		= (p1.x - p1.x);
-			var dlat:Number 		= (p1.y - p1.y);
-			return Math.sqrt(dlat * dlat + dlong * dlong) * .01113195;
-		}
-
         public function init():void {
 			for(var i:int = 0; i < delay_array.length; i++){
 				delay_array[i].alt = _copter_loc.alt;
@@ -72,6 +65,10 @@ package com {
 			new_data 	= false;
         	pointer 	= 0;
         	gps_counter = 0;
+        	longitude 	= 0;
+			latitude  	= 0;
+			altitude  	= 0;
+
         }
 
 
@@ -112,15 +109,14 @@ package com {
 
 			*/
 			var old_pointer = (pointer + 1) % max_delay;
-			//var cur_pointer = (pointer + 2) % max_delay;
-			//trace("pointer ",pointer, old_pointer, cur_pointer );
+			var prev_pointer = (pointer + 2) % max_delay;
+			//trace("pointer ",pointer, old_pointer, prev_pointer );
 
-            //var p1 = new Point(delay_array[cur_pointer].lng, delay_array[cur_pointer].lat);
-            //var p2 = new Point(delay_array[old_pointer].lng, delay_array[old_pointer].lat);
+            var p1 = new Point(delay_array[prev_pointer].lng, delay_array[prev_pointer].lat);
+            var p2 = new Point(delay_array[old_pointer].lng, delay_array[old_pointer].lat);
 
-			//ground_course = get_bearing(p1, p2);
-			//ground_speed  = get_distance(p1, p2);
-			//ground_speed  *= 4;
+			ground_course = get_bearing(p1, p2);
+			ground_speed  = Math.abs(Point.distance(p1, p2)) * 4;
 
             new_data = true;
 
@@ -130,10 +126,6 @@ package com {
 			altitude  = delay_array[old_pointer].alt;
         }
 
-		//public function get_distance(loc1:Location, loc2:Location):Number
-		//{
-		//	return	Math.abs(Math.floor((loc2.lng - loc1.lng) * 1.113195));
-		//}
 
 		public function fixrez(n:Number):Number
 		{
