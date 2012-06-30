@@ -50,7 +50,7 @@ package com {
 		public var moment					:Number 	= 3;
 		public var mass						:Number 	= 500;
 		public var esc_delay				:int 		= 12;
-		public var airspeed_fix				:Number 	= 0; // 0.0054;
+		public var airspeed_fix				:Number 	= 0.0054;
 
 
 		// -----------------------------------------
@@ -254,14 +254,12 @@ package com {
 		// -----------------------------------------
 		public var pid_nav_lon				:PID;
 		public var pid_nav_lat				:PID;
-		private var nav_p					:Number = 3.0;
-		private var nav_i					:Number = 0.20;
+		private var nav_p					:Number = 2.4;
+		private var nav_i					:Number = 0.17;
 		private var nav_d					:Number = 0.00;
 		private var nav_imax				:Number = 3000;
 		public var rtl_approach_alt			:int = 100;
-		public var rtl_land_enabled			:Boolean = true;
-		public var RTL_altitude				:int = 0; // ALT_HOLD_HOME  height to return to Home, 0 = Maintain current altitude
-
+		public var RTL_altitude				:int = 1000; // ALT_HOLD_HOME  height to return to Home, 0 = Maintain current altitude
 
 		// Waypoints
 		//
@@ -271,7 +269,7 @@ package com {
 		public var waypoint_radius			:int = 100;
 		public var loiter_radius			:int = 10;
 		public var waypoint_speed_max		:Number = 600;
-		public var crosstrack_gain			:Number = .2;	// XXX SYNC
+		public var crosstrack_gain			:Number = .2;
 		public var auto_land_timeout		:Number = 5000;// milliseconds
 
 		// Throttle
@@ -394,7 +392,7 @@ package com {
 
 			baro_noise_checkbox.setLabel("Baro Noise");
 			axis_enabled_checkbox.setLabel("Axis Lock");
-			rtl_land_checkbox.setLabel("RTL Land Enabled");
+			//rtl_land_checkbox.setLabel("RTL Land Enabled");
 			sonar_checkbox.setLabel("Sonar Enabled");
 
 			NTUN_checkbox.setLabel("Log NTUN");
@@ -432,7 +430,10 @@ package com {
 			acro_P_BI.setNumber(acro_p);
 			axis_enabled_checkbox.setSelected(axis_enabled);
 			sonar_checkbox.setSelected(sonar_enabled);
-			rtl_land_checkbox.setSelected(rtl_land_enabled);
+			//rtl_land_checkbox.setSelected(rtl_land_enabled);
+
+			RTL_altitude_BI.setNumber(RTL_altitude);
+			rtl_approach_alt_BI.setNumber(rtl_approach_alt);
 
 			// for testing alternatives
 			test_checkbox.setSelected(test);
@@ -534,7 +535,11 @@ package com {
 			acro_p						= acro_P_BI.getNumber();
 			axis_enabled				= axis_enabled_checkbox.getSelected();
 			sonar_enabled				= sonar_checkbox.getSelected();
-			rtl_land_enabled			= rtl_land_checkbox.getSelected();
+			//rtl_land_enabled			= rtl_land_checkbox.getSelected();
+
+			RTL_altitude				= RTL_altitude_BI.getNumber();
+			rtl_approach_alt			= rtl_approach_alt_BI.getNumber();
+
 
 			// for testing alternatives
 			test						= test_checkbox.getSelected();
