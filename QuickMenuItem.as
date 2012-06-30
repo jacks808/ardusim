@@ -19,7 +19,7 @@ package com {
 		public var index		:int;
 		public var frame:Rectangle;
 		public var menu:QuickMenu;
-		public var item_height:int = 18;
+		public var item_height:int = 14;
 
 		public function QuickMenuItem(label:String="menuItem", code:String="1"){
             stop();

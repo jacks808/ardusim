@@ -25,7 +25,7 @@ package com {
             stop();
 			addEventListener(Event.ADDED_TO_STAGE, addedToStage);
 			items = new Array();
-			frame = new Rectangle(0,0,200,300);
+			frame = new Rectangle(0,0,150,300);
 			mouseEnabled = false;
 		}
 
