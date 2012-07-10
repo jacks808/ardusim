@@ -74,7 +74,7 @@ package com {
 		public function setDirection(d:Number):void
 		{
 			m3d = new Matrix3D();
-			wind3D = new Vector3D(0, 1, 0);
+			wind3D = new Vector3D(0, -1, 0);
 			m3d.appendRotation(-d, Vector3D.Z_AXIS);	// Yaw
 			wind3D = m3d.transformVector(wind3D);
 		}

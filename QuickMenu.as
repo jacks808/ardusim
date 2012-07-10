@@ -108,6 +108,17 @@ package com {
 			}
 		}
 
+		public function setSelectedItemByCode(s:String)
+		{
+			for(var i:int=1; i <items.length; i++){
+				if (items[i].getCode() == s){
+					setSelectedIndex(items[i].index);
+				}
+			}
+		}
+
+
+
 		public function hasItems():Boolean
 		{
 			return (items.length > 0);

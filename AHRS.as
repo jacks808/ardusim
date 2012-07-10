@@ -1,5 +1,6 @@
 package com {
 	import flash.geom.Vector3D;
+	import flash.geom.Matrix3D;
 
 	public class AHRS extends Location{
 
@@ -7,28 +8,28 @@ package com {
 		public var pitch_sensor:Number = 0;
 		public var yaw_sensor:Number = 0;
 		public var rotation_speed:Vector3D;
+		public var gyro:Vector3D;
 		public var omega:Vector3D;
 		public var accel:Vector3D;
+		public var dcm:Matrix3D;
 
 		public function AHRS() {
 			accel 			= new Vector3D(0,0,0);
+			gyro 			= new Vector3D(0,0,0);
 			rotation_speed 	= new Vector3D(0,0,0);
 			omega 			= new Vector3D(0,0,0);
+			dcm				= new Matrix3D();
 		}
 
 		public function init() {
 			roll_sensor 	= 0;
 			pitch_sensor 	= 0;
 			yaw_sensor 		= 0;
-			omega.x			= 0;
-			omega.y			= 0;
-			omega.z			= 0;
-			rotation_speed.x	= 0;
-			rotation_speed.y	= 0;
-			rotation_speed.z	= 0;
-			accel.x 		= 0;
-			accel.y 		= 0;
-			accel.z 		= 0;
+			accel 			= new Vector3D(0,0,-9.805);
+			gyro 			= new Vector3D(0,0,0);
+			rotation_speed 	= new Vector3D(0,0,0);
+			omega 			= new Vector3D(0,0,0);
+			dcm				= new Matrix3D();
 		}
 
 		public function addToRoll(r:Number) {

@@ -65,12 +65,10 @@ package com {
 			new_data 	= false;
         	pointer 	= 0;
         	gps_counter = 0;
-        	longitude 	= 0;
-			latitude  	= 0;
-			altitude  	= 0;
-
+        	longitude 	= _copter_loc.lng;
+			latitude  	= _copter_loc.lat;
+			altitude  	= _copter_loc.alt;
         }
-
 
         public function read():Boolean
         {
@@ -92,7 +90,6 @@ package com {
 			delay_array[pointer].alt = _copter_loc.alt;
 			delay_array[pointer].lat = fixrez(_copter_loc.lat);
 			delay_array[pointer].lng = fixrez(_copter_loc.lng);
-
 			/*
 			0  previous
 			1  oldest - current

@@ -72,6 +72,7 @@ package com {
 				copter_lag.x	+= frame.width;
 
 			copter_lag.y 	= frame.height - current_loc.alt;
+
 			copter_lag.y 	= copter_lag.y % frame.height;
 			if (copter_lag.y < 0)
 				copter_lag.y	+= frame.height;
@@ -94,16 +95,7 @@ package com {
 
 			//-----------------------------------------------------------------
 
-			//trace("pos", copter.loc.lng, copter.loc.lat);
-
-			//copter.rotation = copter.ahrs.roll_sensor/100;
-			copter_mc.rotation = degrees(Math.asin(copter.angle3D.x));
-
-			copter_lag.rotation = copter_mc.rotation;
-
-			//loc_lng_TF.text = Math.floor(copter.loc.lng) +"cm";
-			//loc_alt_TF.text = Math.floor(copter.loc.alt) +"cm";
-			//speed_TF.text 	= Math.floor(copter.speed) +"cm/s";
+			copter_mc.rotation = -degrees(Math.asin(copter.angle3D.y));
 		}
 
 		public function calc_copter_page():void

@@ -78,6 +78,12 @@
 			setLabel(menu.getSelectedItem()._label);
 		}
 
+		public function setSelectedItemByCode(s:String)
+		{
+			menu.setSelectedItemByCode(s);
+			setLabel(menu.getSelectedItem()._label);
+		}
+
 		public function getSelectedIndex():Number
 		{
 			return menu.current_index;

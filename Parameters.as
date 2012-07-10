@@ -19,16 +19,21 @@ package com {
 	import com.QuickMenu;
 	import com.QuickMenuItem;
 	import com.QuickPopupMenu;
+	import com.QuickCheckBox;
 	import com.BasicInput;
 	import com.Wind;
 	import com.AHRS;
 	import com.PID;
+	import com.Main;
 
 	public class Parameters extends MovieClip
 	{
 		private static var instance			:Parameters = null;
+		public var controller				:Main;
 		public var frame					:Rectangle;
 		public var originalX				:Number = 0;
+
+		public var simple_checkbox			:QuickCheckBox;
 
 		// ---------------------------------------------
 		// Sim Details controls
@@ -43,97 +48,13 @@ package com {
 
 		public var airDensity				:Number 	= 1.184;
 		//public var crossSection				:Number 	= 0.015;
-		public var crossSection				:Number 	= 0.005;
+		public var crossSection				:Number 	= 0.012;
 		public var dragCE					:Number 	= 0.20;
 		public var speed_filter_size		:Number 	= 2;
 		public var motor_kv					:Number 	= 1000;
 		public var moment					:Number 	= 3;
 		public var mass						:Number 	= 500;
 		public var esc_delay				:int 		= 12;
-		public var airspeed_fix				:Number 	= 0.0054;
-
-
-		// -----------------------------------------
-		// SIM
-		// -----------------------------------------
-		public var motor_kv_BI				:BasicInput;
-		public var wind_high_BI				:BasicInput;
-		public var moment_BI				:BasicInput;
-		public var mass_BI					:BasicInput;
-		public var esc_delay_BI				:BasicInput;
-		public var drag_BI					:BasicInput;
-		public var crossSection_BI			:BasicInput;
-		public var airDensity_BI			:BasicInput;
-		public var speed_filter_BI			:BasicInput;
-
-		// -----------------------------------------
-		// Environment
-		// -----------------------------------------
-		public var start_angle_BI			:BasicInput;
-		public var start_climb_rate_BI		:BasicInput;
-		public var start_rotation_BI		:BasicInput;
-		public var start_speed_BI			:BasicInput;
-		public var start_position_BI		:BasicInput;
-		public var start_height_BI			:BasicInput;
-		public var target_distance_BI		:BasicInput;
-		public var target_altitude_BI		:BasicInput;
-		public var wind_low_BI				:BasicInput;
-		public var wind_period_BI			:BasicInput;
-
-		public var wind_checkbox			:QuickCheckBox;
-		public var fastPlot_checkbox		:QuickCheckBox;
-		public var axis_enabled_checkbox	:QuickCheckBox;
-		public var sonar_checkbox			:QuickCheckBox;
-		public var rtl_land_checkbox		:QuickCheckBox;
-		public var lead_filter_checkbox		:QuickCheckBox;
-		public var simple_checkbox			:QuickCheckBox;
-
-		public var test_checkbox			:QuickCheckBox;
-
-		public var NTUN_checkbox			:QuickCheckBox;
-		public var CTUN_checkbox			:QuickCheckBox;
-
-		// stability
-		public var stab_roll_P_BI			:BasicInput;
-		public var stab_roll_I_BI			:BasicInput;
-		public var stab_roll_Imax_BI		:BasicInput;
-		public var stab_rate_P_BI			:BasicInput;
-		public var stab_rate_I_BI			:BasicInput;
-		public var stab_rate_Imax_BI		:BasicInput;
-		public var stab_rate_D_BI			:BasicInput;
-		public var stabilize_d_BI			:BasicInput;
-		public var stabilize_d_schedule_BI	:BasicInput;
-
-		// Acro
-		public var acro_P_BI				:BasicInput;
-
-		// loiter
-		public var loiter_hold_P_BI			:BasicInput;
-		public var loiter_rate_P_BI			:BasicInput;
-		public var loiter_rate_I_BI			:BasicInput;
-		public var loiter_rate_Imax_BI		:BasicInput;
-		public var loiter_rate_D_BI			:BasicInput;
-
-		// nav
-		public var waypoint_speed_max_BI	:BasicInput;
-		public var nav_P_BI					:BasicInput;
-		public var nav_I_BI					:BasicInput;
-		public var nav_Imax_BI				:BasicInput;
-		public var nav_D_BI					:BasicInput;
-
-
-		public var alt_hold_P_BI			:BasicInput;
-		public var alt_hold_I_BI			:BasicInput;
-		public var alt_hold_Imax_BI			:BasicInput;
-
-		// Alt hold
-		public var alt_rate_P_BI			:BasicInput;
-		public var alt_rate_I_BI			:BasicInput;
-		public var alt_rate_Imax_BI			:BasicInput;
-		public var alt_rate_D_BI			:BasicInput;
-		public var throttle_error_BI		:BasicInput;
-
-
 		public var test						:Boolean = false;
 
 		// -----------------------------------------
@@ -175,11 +96,11 @@ package com {
 
 
 		private var stabilize_yaw_p			:Number = 7.0;
-		private var stabilize_yaw_i			:Number = .01;
+		private var stabilize_yaw_i			:Number = .02;
 		private var stabilize_yaw_imax		:Number = 800;
 
 		private var rate_yaw_p				:Number = 0.13; // .14
-		private var rate_yaw_i				:Number = 0.0;
+		private var rate_yaw_i				:Number = 0.02;
 		private var rate_yaw_d				:Number = 0.004;  // .002
 		private var rate_yaw_imax			:Number = 5000;
 
@@ -196,33 +117,37 @@ package com {
 		private var alt_hold_p				:Number = 0.5;
 		private var alt_hold_i				:Number = 0		// 0.007;
 		private var alt_hold_imax			:Number = 300;
-		private var throttle_rate_p			:Number = 3.0 	//0.25;
-		private var throttle_rate_i			:Number = 0.5;
+		private var throttle_rate_p			:Number = 6.0 	//0.25;
+		private var throttle_rate_i			:Number = 0.4;
 		private var throttle_rate_d			:Number = 0.0;
 		private var throttle_rate_imax		:Number = 300;
-		*/
+		//*/
 
 		//reg gains
-		private var alt_hold_p				:Number = 0.8;
-		private var alt_hold_i				:Number = 0.007
+		//*
+		private var alt_hold_p				:Number = 0.4;
+		private var alt_hold_i				:Number = 0.038
 		private var alt_hold_imax			:Number = 300;
-		private var throttle_rate_p			:Number = .35
+		private var throttle_rate_p			:Number = .4
 		private var throttle_rate_i			:Number = 0.0;
 		private var throttle_rate_d			:Number = 0.0;
 		private var throttle_rate_imax		:Number = 300;
+		//*/
 
 		// -----------------------------------------
 		// Inertial control
 		// -----------------------------------------
-		public var speed_correction_x		:Number = 0.020;
 		public var speed_correction_z		:Number = 0.0350;
-		public var loiter_offset_correction	:Number = 0.000001; //0.000003
-		public var loiter_vel_correction	:Number = 0.03;.007
-		public var accel_bias_x				:Number = .2;
+		public var xy_speed_correction		:Number = 0.030;
+		public var xy_offset_correction		:Number = 0.00001;
+		public var xy_pos_correction		:Number = 0.08;
 
-		public var alt_offset_correction	:Number = 0.000003;
-		public var alt_vel_correction		:Number = 0.006;
-		public var accel_bias_z				:Number = .2;
+		public var z_offset_correction		:Number = 0.00004;
+		public var z_pos_correction			:Number = 0.2;
+
+		public var accel_bias_x				:Number = 1;
+		public var accel_bias_z				:Number = .9;
+		public var accel_bias_y				:Number = 1;
 
 		// -----------------------------------------
 		// Loiter
@@ -234,43 +159,59 @@ package com {
 
 		/*
 		// inertia gains
-		private var loiter_p				:Number = 0.5; // 0
-		private var loiter_rate_p			:Number = 12; // 1.0
-		private var loiter_rate_i			:Number = 1.1; // .05
-		private var loiter_rate_d			:Number = 0.0; // 3.8
-		private var loiter_rate_imax		:Number = 3000; // .05
-		*/
+		private var loiter_p				:Number = 0.5;
+		private var loiter_rate_p			:Number = 12;
+		private var loiter_rate_i			:Number = 1.1;
+		private var loiter_rate_d			:Number = 0.0;
+		private var loiter_rate_imax		:Number = 3000;
+		//*/
 
 		// reg gains
-		private var loiter_p				:Number = 0.2; // 0
-		private var loiter_rate_p			:Number = 2.4; // 1.0
-		private var loiter_rate_i			:Number = 0.08; // .05
-		private var loiter_rate_d			:Number = 0.0; // 3.8
-		private var loiter_rate_imax		:Number = 3000; // .05
-
+		//*
+		private var loiter_p				:Number = 0.2;
+		private var loiter_rate_p			:Number = 2.4;
+		private var loiter_rate_i			:Number = 0.08;
+		private var loiter_rate_d			:Number = 0.0;
+		private var loiter_rate_imax		:Number = 3000;
+		//*/
 
 		// -----------------------------------------
 		// NAV, RTL
 		// -----------------------------------------
+		public var tilt_comp				:int 	= 54;
 		public var pid_nav_lon				:PID;
 		public var pid_nav_lat				:PID;
-		private var nav_p					:Number = 2.4;
-		private var nav_i					:Number = 0.17;
-		private var nav_d					:Number = 0.00;
-		private var nav_imax				:Number = 3000;
 		public var rtl_approach_alt			:int = 100;
 		public var RTL_altitude				:int = 1000; // ALT_HOLD_HOME  height to return to Home, 0 = Maintain current altitude
+
+		/*
+		// inertia gains
+		private var nav_p					:Number = 3;
+		private var nav_i					:Number = 0.17;
+		private var nav_d					:Number = 0.21;
+		private var nav_imax				:Number = 3000;
+		public var crosstrack_gain			:Number = .15;
+		//*/
+
+		// reg gains
+		//*
+		private var nav_p					:Number = 2.2;
+		private var nav_i					:Number = 0.17;
+		private var nav_d					:Number = 0.95;
+		private var nav_imax				:Number = 3000;
+		public var crosstrack_gain			:Number = .05;
+		//*/
+
 
 		// Waypoints
 		//
 		public var command_total			:int = 0;
 		public var command_index			:int = 0;
 		public var command_nav_index		:int = 0;
-		public var waypoint_radius			:int = 100;
+		public var waypoint_radius			:int = 200;
 		public var loiter_radius			:int = 10;
 		public var waypoint_speed_max		:Number = 600;
-		public var crosstrack_gain			:Number = .2;
-		public var auto_land_timeout		:Number = 5000;// milliseconds
+		public var auto_land_timeout		:Number = 500;// milliseconds
 
 		// Throttle
 		//
@@ -279,9 +220,10 @@ package com {
 		public var throttle_fs_enabled		:Boolean 	= true;
 		public var throttle_fs_action		:int 		= 2;
 		public var throttle_fs_value		:int 		= 975;
+
 		public const THROTTLE_CRUISE		:int		= 551;
 
-		public var throttle_cruise			:Number 	= 551;
+		public var throttle_cruise			:Number;
 		public var throttle_cruise_e		:Number 	= 0;
 
 
@@ -306,7 +248,7 @@ package com {
 		//public var ch7_option				:int		= 6; // CH7_ADC_FILTER 6
 		//public var ch7_option				:int		= 7; // CH7_SAVE_WP 7
 
-		public var auto_slew_rate			:Number 	= 60;
+		public var auto_slew_rate			:Number 	= 30;
 
 		// RC channels
 		public var rc_1						:RC_Channel;
@@ -337,7 +279,7 @@ package com {
 		{
 			if (instance == null)
 			  instance = this;
-
+			this.visible = false;
 			frame 		= new Rectangle(0,0,250,450);
 
 			// radio
@@ -375,6 +317,7 @@ package com {
 			pid_nav_lat 			= new PID(nav_p, nav_i , nav_d, nav_imax);
 
 			addEventListener(Event.ADDED_TO_STAGE, addedToStage);
+			throttle_cruise = THROTTLE_CRUISE;
 		}
 
 		//Parameters.getInstance();
@@ -403,11 +346,15 @@ package com {
 			lead_filter_checkbox.setLabel("GPS Lead Filter");
 			inertia_checkbox.setLabel("Inertial Control");
 			simple_checkbox.setLabel("Simple Mode");
+			super_simple_checkbox.setLabel("Super Simple Mode");
 			initGains();
+
 		}
 
+		// called at startup to fill in values for defaults
 		private function initGains():void
 		{
+			sim_iterations_BI.setNumber(sim_iterations);
 			sim_speed_BI.setNumber(sim_speed);
 			lead_filter_checkbox.setSelected(true);
 			toy_yaw_rate_BI.setNumber(toy_yaw_rate);
@@ -426,6 +373,16 @@ package com {
 			stabilize_d_schedule_BI.setNumber(stabilize_d_schedule);
 			stabilize_d_BI.setNumber(stabilize_d);
 
+			stabilize_yaw_p_BI.setNumber(stabilize_yaw_p);
+			stabilize_yaw_i_BI.setNumber(stabilize_yaw_i);
+			stabilize_yaw_imax_BI.setNumber(stabilize_yaw_imax);
+
+
+			rate_yaw_p_BI.setNumber(rate_yaw_p);
+			rate_yaw_i_BI.setNumber(rate_yaw_i);
+			rate_yaw_imax_BI.setNumber(rate_yaw_imax);
+			rate_yaw_d_BI.setNumber(rate_yaw_d);
+
 			// Acro P
 			acro_P_BI.setNumber(acro_p);
 			axis_enabled_checkbox.setSelected(axis_enabled);
@@ -434,18 +391,20 @@ package com {
 
 			RTL_altitude_BI.setNumber(RTL_altitude);
 			rtl_approach_alt_BI.setNumber(rtl_approach_alt);
+			auto_land_timeout_BI.setNumber(auto_land_timeout);
 
 			// for testing alternatives
 			test_checkbox.setSelected(test);
 
-			speed_correction_x_BI.setNumber(speed_correction_x);
-			loiter_offset_correction_BI.setNumber(loiter_offset_correction);
-			loiter_vel_correction_BI.setNumber(loiter_vel_correction);
+			xy_speed_correction_BI.setNumber(xy_speed_correction);
+			xy_offset_correction_BI.setNumber(xy_offset_correction);
+			xy_pos_correction_BI.setNumber(xy_pos_correction);
 			accel_bias_x_BI.setNumber(accel_bias_x);
+			accel_bias_y_BI.setNumber(accel_bias_y);
 
 			speed_correction_z_BI.setNumber(speed_correction_z);
-			alt_offset_correction_BI.setNumber(alt_offset_correction);
-			alt_vel_correction_BI.setNumber(alt_vel_correction);
+			z_offset_correction_BI.setNumber(z_offset_correction);
+			z_pos_correction_BI.setNumber(z_pos_correction);
 			accel_bias_z_BI.setNumber(accel_bias_z);
 
 			// loiter
@@ -499,13 +458,13 @@ package com {
 			moment_BI.setNumber(moment);
 			mass_BI.setNumber(mass);
 			esc_delay_BI.setNumber(esc_delay);
-			airspeed_fix_BI.setNumber(airspeed_fix);
+			airspeed_fix_BI.setNumber(tilt_comp);
 		}
 
 		public function updateGains():void
 		{
 			sim_speed					= sim_speed_BI.getNumber();
-
+			sim_iterations				= sim_iterations_BI.getNumber();
 			//auto_slew_rate				= auto_slew_rate_BI.getNumber();
 			toy_yaw_rate				= toy_yaw_rate_BI.getNumber();
 
@@ -528,8 +487,21 @@ package com {
 			pid_rate_pitch._imax		= stab_rate_Imax_BI.getNumber();
 			pid_rate_pitch._kd			= stab_rate_D_BI.getNumber();
 
+
+			pi_stabilize_yaw._kp		= stabilize_yaw_p_BI.getNumber();
+			pi_stabilize_yaw._ki		= stabilize_yaw_i_BI.getNumber();
+			pi_stabilize_yaw._imax		= stabilize_yaw_imax_BI.getNumber();
+
+
+			pid_rate_yaw._kp			= rate_yaw_p_BI.getNumber();
+			pid_rate_yaw._ki			= rate_yaw_i_BI.getNumber();
+			pid_rate_yaw._imax			= rate_yaw_imax_BI.getNumber();
+			pid_rate_yaw._kd			= rate_yaw_d_BI.getNumber();
+
 			stabilize_d_schedule 		= stabilize_d_schedule_BI.getNumber();
 			stabilize_d 				= stabilize_d_BI.getNumber();
+
+			super_simple				= super_simple_checkbox.getSelected();
 
 			// acro
 			acro_p						= acro_P_BI.getNumber();
@@ -539,19 +511,20 @@ package com {
 
 			RTL_altitude				= RTL_altitude_BI.getNumber();
 			rtl_approach_alt			= rtl_approach_alt_BI.getNumber();
-
+			auto_land_timeout			= auto_land_timeout_BI.getNumber();
 
 			// for testing alternatives
 			test						= test_checkbox.getSelected();
 
-			speed_correction_x			= speed_correction_x_BI.getNumber();
-			loiter_offset_correction	= loiter_offset_correction_BI.getNumber();
-			loiter_vel_correction		= loiter_vel_correction_BI.getNumber();
+			xy_speed_correction			= xy_speed_correction_BI.getNumber();
+			xy_offset_correction		= xy_offset_correction_BI.getNumber();
+			xy_pos_correction			= xy_pos_correction_BI.getNumber();
 			accel_bias_x				= accel_bias_x_BI.getNumber();
+			accel_bias_y				= accel_bias_y_BI.getNumber();
 
 			speed_correction_z			= speed_correction_z_BI.getNumber();
-			alt_offset_correction		= alt_offset_correction_BI.getNumber();
-			alt_vel_correction			= alt_vel_correction_BI.getNumber();
+			z_offset_correction			= z_offset_correction_BI.getNumber();
+			z_pos_correction			= z_pos_correction_BI.getNumber();
 			accel_bias_z				= accel_bias_z_BI.getNumber();
 
 
@@ -602,7 +575,7 @@ package com {
 			moment						= moment_BI.getNumber();
 			mass						= mass_BI.getNumber();
 			esc_delay					= esc_delay_BI.getNumber();
-			airspeed_fix				= airspeed_fix_BI.getNumber();
+			tilt_comp					= airspeed_fix_BI.getNumber();
 
 			if(moment == 0) moment = 1;
 			if(mass == 0) mass = 1;
