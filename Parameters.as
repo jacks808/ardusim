@@ -115,9 +115,9 @@ package com {
 		/*
 		// inertia gains
 		private var alt_hold_p				:Number = 0.5;
-		private var alt_hold_i				:Number = 0		// 0.007;
+		private var alt_hold_i				:Number = 0.0;
 		private var alt_hold_imax			:Number = 300;
-		private var throttle_rate_p			:Number = 6.0 	//0.25;
+		private var throttle_rate_p			:Number = 6.0;
 		private var throttle_rate_i			:Number = 0.4;
 		private var throttle_rate_d			:Number = 0.0;
 		private var throttle_rate_imax		:Number = 300;
@@ -129,9 +129,10 @@ package com {
 		private var alt_hold_i				:Number = 0.038
 		private var alt_hold_imax			:Number = 300;
 		private var throttle_rate_p			:Number = .4
-		private var throttle_rate_i			:Number = 0.0;
+		private var throttle_rate_i			:Number = 0.1;
 		private var throttle_rate_d			:Number = 0.0;
 		private var throttle_rate_imax		:Number = 300;
+		public var alt_comp					:int = 30;
 		//*/
 
 		// -----------------------------------------
@@ -145,9 +146,9 @@ package com {
 		public var z_offset_correction		:Number = 0.00004;
 		public var z_pos_correction			:Number = 0.2;
 
-		public var accel_bias_x				:Number = 1;
+		public var accel_bias_x				:Number = .9;
 		public var accel_bias_z				:Number = .9;
-		public var accel_bias_y				:Number = 1;
+		public var accel_bias_y				:Number = .9;
 
 		// -----------------------------------------
 		// Loiter
@@ -181,8 +182,8 @@ package com {
 		public var tilt_comp				:int 	= 54;
 		public var pid_nav_lon				:PID;
 		public var pid_nav_lat				:PID;
-		public var rtl_approach_alt			:int = 100;
-		public var RTL_altitude				:int = 1000; // ALT_HOLD_HOME  height to return to Home, 0 = Maintain current altitude
+		public var rtl_approach_alt			:int = 200;
+		public var RTL_altitude				:int = 2500; // ALT_HOLD_HOME  height to return to Home, 0 = Maintain current altitude
 
 		/*
 		// inertia gains
@@ -208,9 +209,9 @@ package com {
 		public var command_total			:int = 0;
 		public var command_index			:int = 0;
 		public var command_nav_index		:int = 0;
-		public var waypoint_radius			:int = 200;
+		public var waypoint_radius			:int = 2;
 		public var loiter_radius			:int = 10;
-		public var waypoint_speed_max		:Number = 600;
+		public var waypoint_speed_max		:Number = 500;
 		public var auto_land_timeout		:Number = 500;// milliseconds
 
 		// Throttle
@@ -459,6 +460,7 @@ package com {
 			mass_BI.setNumber(mass);
 			esc_delay_BI.setNumber(esc_delay);
 			airspeed_fix_BI.setNumber(tilt_comp);
+			alt_comp_BI.setNumber(alt_comp);
 		}
 
 		public function updateGains():void
@@ -576,6 +578,7 @@ package com {
 			mass						= mass_BI.getNumber();
 			esc_delay					= esc_delay_BI.getNumber();
 			tilt_comp					= airspeed_fix_BI.getNumber();
+			alt_comp					= alt_comp_BI.getNumber();
 
 			if(moment == 0) moment = 1;
 			if(mass == 0) mass = 1;
