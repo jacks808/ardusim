@@ -16,14 +16,19 @@ package com {
 
 		public function get_position(pos:Number, vel:Number):Number
 		{
-			vel = (last_velocity + vel) / 2;
-			var new_position:Number  = pos + vel;
-			new_position += (vel - last_velocity);
+			var acceleration:Number = vel - last_velocity;
+			//trace(pos, vel, acceleration);
+
 			last_velocity = vel;
-			return new_position;
+			return pos + vel + acceleration;
 		}
+
 	}
 }
 
+/*
+	   500  >
+------|-----------------
+------|-----|-----------
 
-
+*/
