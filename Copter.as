@@ -219,12 +219,15 @@
 			//*/
 
 			// hacked vert disturbance
-			accel_earth.z		+= _jump_z * dt;
+			accel_earth.z	+= _jump_z * dt;
 			_jump_z 		*= .999;
 
 
 			// Add in Gravity
 			accel_earth.z += gravity;
+
+			if(accel_earth.z < 0)
+				accel_earth.z *=.9;
 
 
 			if(position.z <=.11 && accel_earth.z > 0){
