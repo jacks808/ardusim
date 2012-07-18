@@ -78,7 +78,7 @@
 
 			//trace(altitude, _copter_loc.alt);
 			if(enable_noise)
-				return altitude + scaleArray[index];
+				return altitude + scaleArray[index]/2;
 			else
 				return altitude;// + scaleArray[index];
 		}
