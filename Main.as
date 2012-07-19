@@ -555,7 +555,7 @@
 		// Altitude hold
 		// -----------------------------------------
 		public var angle_boost						:Number = 0;
-		public var manual_boost						:Number = 0;
+		//public var manual_boost						:Number = 0;
 		public var nav_throttle						:Number = 0;
 		public var z_target_speed					:Number = 0;
 		public var i_hold							:Number = 0;
@@ -570,7 +570,7 @@
 		public var altitude_error					:Number = 0;
 		public var old_altitude						:Number = 0;
 		public var old_alt							:Number = 0;
-		public var reset_throttle_flag				:Boolean = false;
+		public var reset_throttle_counter			:int = 0;
 
 		public var climb_rate						:Number = 0;
 		public var climb_rate_avg					:Number = 0;
@@ -1454,72 +1454,57 @@
 
 				case THROTTLE_HOLD:
 					// allow interactive changing of atitude
-					adjust_altitude();
+					if(g.rc_3.control_in < 200){
+						reset_throttle_counter = 50;
+						nav_throttle 		= get_throttle_rate(-80);
+						g.rc_3.servo_out 	= g.throttle_cruise + nav_throttle + angle_boost;
+						break;
+					}else if (g.rc_3.control_in > 800){
+						reset_throttle_counter = 50;
+						nav_throttle 		= get_throttle_rate(80);
+						g.rc_3.servo_out 	= g.throttle_cruise + nav_throttle + angle_boost;
+						break;
+					}
 
-					// fall through
+					if(reset_throttle_counter > 0){
+						reset_throttle_counter--;
+						if(reset_throttle_counter == 0){
+							force_new_altitude(Math.max(current_loc.alt, 100));
+						}else{
+							nav_throttle 		= get_throttle_rate(0);
+						}
+					}
+
+					// else fall through
 
 				case THROTTLE_AUTO:
 					// calculate angle boost
 					angle_boost = get_angle_boost(g.throttle_cruise);
 
-					// manual command up or down?
-					if(manual_boost != 0){
-						throttle_out = g.throttle_cruise + angle_boost + manual_boost;
+					// 10hz
+					if(motors.auto_armed == true){
 
-						//force a reset of the altitude change
-						clear_new_altitude();
+						// how far off are we
+						altitude_error = get_altitude_error();
 
-						// this lets us know we need to update the altitude after manual throttle control
-						reset_throttle_flag = true;
-
-					}else{
-						// we are under automatic throttle control
-						// ---------------------------------------
-						if(reset_throttle_flag)	{
-							force_new_altitude(Math.max(current_loc.alt, 100));
-							reset_throttle_flag = false;
-							update_throttle_cruise();
+						var desired_speed:Number;
+						if(alt_change_flag == REACHED_ALT){ // we are at or above the target alt
+							desired_speed 		= g.pi_alt_hold.get_p(altitude_error);			// calculate desired speed from lon error
+							desired_speed		= constrain(desired_speed, -250, 250);
+							nav_throttle 		= get_throttle_rate(desired_speed);
+						}else{
+							desired_speed 		= get_desired_climb_rate(150);
+							nav_throttle 		= get_throttle_rate(desired_speed);
 						}
-
-						// 10hz, 			don't run up i term
-						if(motors.auto_armed == true){
-
-							// how far off are we
-							altitude_error = get_altitude_error();
-
-							// SYNC
-							if(g.test){
-								// get the AP throttle
-								//nav_throttle = get_nav_throttle(altitude_error);
-								var desired_speed:Number;
-								if(alt_change_flag == REACHED_ALT){ // we are at or above the target alt
-									desired_speed 		= g.pi_alt_hold.get_p(altitude_error);			// calculate desired speed from lon error
-									desired_speed		= constrain(desired_speed, -250, 250);
-									nav_throttle 		= get_throttle_rate(desired_speed);
-								}else{
-									desired_speed 		= get_desired_climb_rate(150);
-									nav_throttle 		= get_throttle_rate(desired_speed);
-								}
-							}else{
-								// get the AP throttle
-								nav_throttle = get_nav_throttle(altitude_error);
-							}
-						}
-
-						// hack to remove the influence of the ground effect
-						if(g.sonar_enabled && current_loc.alt < 100 && landing_boost != 0) {
-							nav_throttle = Math.min(nav_throttle, 0);
-						}
-
-						//z_boost = get_z_boost();
-						//z_boost = 0;
-						throttle_out = g.throttle_cruise + nav_throttle + angle_boost - landing_boost;
 					}
 
-					// light filter of output
-					//g.rc_3.servo_out = (g.rc_3.servo_out * (THROTTLE_FILTER_SIZE - 1) + throttle_out) / THROTTLE_FILTER_SIZE;
+					// hack to remove the influence of the ground effect
+					if(g.sonar_enabled && current_loc.alt < 100 && landing_boost != 0) {
+						nav_throttle = Math.min(nav_throttle, 0);
+					}
 
-					// no filter
+					throttle_out = g.throttle_cruise + nav_throttle + angle_boost - landing_boost;
+
 					g.rc_3.servo_out = throttle_out;
 					break;
 			}
@@ -1807,7 +1792,7 @@
 				current_loc.alt += (climb_rate / 50);
 			}
 		}
-
+		/*
 		//#define THROTTLE_ADJUST 225
 		public function adjust_altitude():void
 		{
@@ -1825,6 +1810,7 @@
 				manual_boost = 0;
 			}
 		}
+		*/
 
 		// Outputs Nav_Pitch and Nav_Roll
 		public function update_nav_wp()
@@ -2165,7 +2151,8 @@
 			d_alt_rate			= g.pid_throttle.get_d(z_rate_error, m_dt);
 			d_alt_rate			= constrain(d_alt_rate, -2000, 2000);
 
-			var tmp:Number  = (_z_target_speed * _z_target_speed * g.alt_comp) / 10000;
+			var tmp:Number  = (_z_target_speed * _z_target_speed * g.throttle_cruise) / 200000;
+
 			tmp = Math.round(tmp);
 
 			//100 * 100 * .5 / 10000
@@ -4618,34 +4605,15 @@
 
 		public function get_desired_climb_rate(speed:Number):Number
 		{
-			/*
-			|< WP Radius
-			0  1   2   3   4   5   6   7   8m
-			...|...|...|...|...|...|...|...|
-				  100  |  200	  300	  400cm/s
-					   |  		 		            +|+
-					   |< we should slow to 1.5 m/s as we hit the target
-			*/
-
 			if(alt_change_flag == ASCENDING){
-				//speed		= Math.min(speed, altitude_error / 3);
-				speed		= constrain(altitude_error / 4, 30, speed);
+				return constrain(altitude_error / 4, 65, speed);
 
 			}else if(alt_change_flag == DESCENDING){
-				//speed		= Math.max(speed, altitude_error / 3);
-				speed		= constrain(altitude_error / 6, -speed, -10);
-				trace("desired speed: ", altitude_error / 6)
+				return constrain(altitude_error / 6, -speed, -10);
 
-			}else return 0;
-
-			// limit the ramp up of the speed
-			// waypoint_speed_gov is reset to 0 at each new WP command
-			//if(speed > waypoint_speed_gov){
-			//	climbrate_gov += (100.0 * dTnav); // increase at .5/ms
-			//	speed = waypoint_speed_gov;
-			//}
-
-			return speed;
+			}else{
+				 return 0;
+			}
 		}
 
 
@@ -4938,7 +4906,7 @@
 
 		private function Log_Write_Control_Tuning():void
 		{
-			trace("CTUN,"+ g.rc_3.control_in +","+ 0 +","+  baro_alt  +","+  next_WP.alt +","+ nav_throttle +","+ angle_boost +","+ manual_boost +","+ climb_rate +","+ copter.throttle +","+ g.pi_alt_hold.get_integrator() +","+ g.pid_throttle.get_integrator());
+			trace("CTUN,"+ g.rc_3.control_in +","+ 0 +","+  baro_alt  +","+  next_WP.alt +","+ nav_throttle +","+ angle_boost +","+ g.rc_3.servo_out +","+ climb_rate +","+ copter.throttle +","+ g.pi_alt_hold.get_integrator() +","+ g.pid_throttle.get_integrator());
 		}
 		private function Log_Write_Attitude():void
 		{
@@ -4982,11 +4950,11 @@
 			motors.auto_armed = (g.rc_3.control_in > 0);
 
 			// clearing value used in interactive alt hold
-			manual_boost = 0;
+			//manual_boost = 0;
 
 			// clearing value used to force the copter down in landing mode
 			landing_boost = 0;
-			reset_throttle_flag = false;
+			reset_throttle_counter = 0;
 
 			// do we want to come to a stop or pass a WP?
 			slow_wp = false;
@@ -5704,7 +5672,7 @@
 			// Altitude hold
 			// -----------------------------------------
 			angle_boost						= 0;
-			manual_boost					= 0;
+			//manual_boost					= 0;
 			nav_throttle					= 0;
 			z_target_speed					= 0;
 			i_hold							= 0;
@@ -5719,7 +5687,7 @@
 			altitude_error					= 0;
 			old_altitude					= 0;
 			old_alt							= 0;
-			reset_throttle_flag				= false;
+			reset_throttle_counter			= 0;
 
 			climb_rate						= 0;
 			climb_rate_actual				= 0;
