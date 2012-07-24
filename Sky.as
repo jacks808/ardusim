@@ -95,7 +95,16 @@ package com {
 
 			//-----------------------------------------------------------------
 
-			copter_mc.rotation = -degrees(Math.asin(copter.angle3D.y));
+			//if(copter.angle3D.z >0)
+			//	copter_mc.rotation = -degrees(Math.asin(copter.angle3D.y));
+			//else
+			//	copter_mc.rotation = degrees(Math.asin(copter.angle3D.y));
+
+			//trace(copter.ahrs.roll_sensor/100);
+			//copter_mc.rotation = copter.ahrs.roll_sensor/100;
+
+			copter_mc.rotation = degrees(Math.atan2(copter.angle3D.z, copter.angle3D.y)) -90;
+			//trace("copter.angle3D.y", copter.angle3D.y, copter_mc.rotation);
 		}
 
 		public function calc_copter_page():void

@@ -833,6 +833,7 @@
 			//right_sticks.sticky_y = true;
 			left_sticks.sticky_y = true;
 			left_sticks.sticky_x = true;
+			//left_sticks.knob_y.y = 100;
 
 			init_sim();
 
@@ -1439,6 +1440,7 @@
 						if (takeoff_complete == false && motors.armed){
 							if (g.rc_3.control_in > g.throttle_cruise){
 								// we must be in the air by now
+								//trace("takeoff_complete = true")
 								takeoff_complete = true;
 							}
 						}
@@ -1490,10 +1492,15 @@
 						var desired_speed:Number;
 						if(alt_change_flag == REACHED_ALT){ // we are at or above the target alt
 							desired_speed 		= g.pi_alt_hold.get_p(altitude_error);			// calculate desired speed from lon error
+							i_hold				= g.pi_alt_hold.get_i(altitude_error, m_dt);			// calculate desired speed from lon error
 							desired_speed		= constrain(desired_speed, -250, 250);
-							nav_throttle 		= get_throttle_rate(desired_speed);
+							if(g.test == false){
+								nav_throttle 		= get_throttle_rate(desired_speed + i_hold);
+							}else{
+								nav_throttle 		= get_throttle_rate(desired_speed) + i_hold;
+							}
 						}else{
-							desired_speed 		= get_desired_climb_rate(150);
+							desired_speed 		= get_desired_climb_rate();
 							nav_throttle 		= get_throttle_rate(desired_speed);
 						}
 					}
@@ -1890,7 +1897,7 @@
 				//calc_loiter_pitch_roll();
 
 				// XXX Finish and Sync
-				limit_pitch_and_roll(altitude_error);
+				//limit_pitch_and_roll(altitude_error);
 
 
 			}else if(wp_control == TOY_MODE){ // THOR added to navigate to Virtual WP
@@ -3157,10 +3164,9 @@
 		public function verify_nav_wp():Boolean
 		{
 			// Altitude checking
-			if(next_WP.options & MASK_OPTIONS_RELATIVE_ALT){
+			if(next_WP.options & WP_OPTION_ALT_REQUIRED){
 				// we desire a certain minimum altitude
-				//if (current_loc.alt > next_WP.alt){
-				if (current_loc.alt > target_altitude){
+				if(alt_change_flag == REACHED_ALT){
 
 					// we have reached that altitude
 					wp_verify_byte |= NAV_ALTITUDE;
@@ -3758,6 +3764,17 @@
 			if(g.ch7_option == CH7_SIMPLE_MODE){
 				//do_simple = (g.rc_7.radio_in > CH_7_PWM_TRIGGER);
 
+			}else if (g.ch7_option == CH7_FLIP){
+				if (trim_flag == false && g.rc_7.radio_in > CH_7_PWM_TRIGGER){
+					trim_flag = true;
+
+					if(g.rc_3.control_in != 0 && takeoff_complete)
+						init_flip();
+				}
+				if (trim_flag == true && g.rc_7.control_in < 800){
+					trim_flag = false;
+				}
+
 			}else if (g.ch7_option == CH7_RTL){
 				if (trim_flag == false && g.rc_7.radio_in > CH_7_PWM_TRIGGER){
 					trim_flag = true;
@@ -3857,7 +3874,7 @@
 						set_mode(RTL);
 						// We add an additional 10m to the current altitude
 						//next_WP.alt += 1000;
-						set_new_altitude(target_altitude + 1000);
+						set_new_altitude(next_WP.alt + 1000);
 					}
 					// 2 = Stay in AUTO and ignore failsafe
 					break;
@@ -3880,6 +3897,10 @@
 
 		public function failsafe_off_event():void
 		{
+			// If we are in AUTO, no need to do anything
+			if(control_mode == AUTO)
+				return;
+
 			if (g.throttle_fs_action == 2){
 				// We're back in radio contact
 				// return to AP
@@ -3943,6 +3964,7 @@
 
 		public function init_flip():void
 		{
+			trace("init flip");
 			if(do_flip == false){
 				do_flip = true;
 				flip_timer = 0;
@@ -3966,9 +3988,9 @@
 					flip_state++;
 					break;
 				case 1: // Step 2 : Increase throttle to start maneuver
-					if (flip_timer < 95){ 	// .5 seconds
+					if (flip_timer < 90){ 	// .5 seconds
 						g.rc_1.servo_out = get_stabilize_roll(0);
-						g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC;
+						g.rc_3.servo_out = g.throttle_cruise + AAP_THR_INC;
 						flip_timer++;
 					}else{
 						flip_state++;
@@ -3980,7 +4002,7 @@
 					if (ahrs.roll_sensor < 4500){
 						// Roll control
 						g.rc_1.servo_out = AAP_ROLL_OUT;
-						g.rc_3.servo_out = g.rc_3.control_in;
+						g.rc_3.servo_out = g.throttle_cruise;
 					}else{
 						flip_state++;
 					}
@@ -3988,17 +4010,17 @@
 
 				case 3: // Step 4 : CONTINUE ROLL (until we reach a certain angle [-45deg])
 					if((ahrs.roll_sensor >= 4500) || (ahrs.roll_sensor < -9000)){// we are in second half of roll
-						g.rc_1.servo_out = 0;
-						g.rc_3.servo_out = g.rc_3.control_in - AAP_THR_DEC;
+						g.rc_1.servo_out = get_rate_roll(40000);
+						g.rc_3.servo_out = g.throttle_cruise - AAP_THR_DEC;
 					}else{
 						flip_state++;
 					}
 					break;
 
 				case 4: // Step 5 : Increase throttle to stop the descend
-					if (flip_timer < 90){ // .5 seconds
+					if (flip_timer < 120){ // .5 seconds
 						g.rc_1.servo_out = get_stabilize_roll(0);
-						g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC + 30;
+						g.rc_3.servo_out = g.throttle_cruise + g.throttle_cruise / 2;
 						flip_timer++;
 					}else{
 						flip_state++;
@@ -4586,10 +4608,10 @@
 
 			// max_speed is default 600 or 6m/s
 			if(_slow){
-				max_speed		= Math.min(max_speed, wp_distance / 3);
+				max_speed		= Math.min(max_speed, wp_distance / 4);
 				max_speed		= Math.max(max_speed, 0);
 			}else{
-				max_speed		= Math.min(max_speed, wp_distance / 3);
+				max_speed		= Math.min(max_speed, wp_distance / 2);
 				max_speed		= Math.max(max_speed, WAYPOINT_SPEED_MIN);	// go at least 100cm/s
 			}
 
@@ -4603,20 +4625,18 @@
 			return max_speed;
 		}
 
-		public function get_desired_climb_rate(speed:Number):Number
+		public function get_desired_climb_rate():Number
 		{
 			if(alt_change_flag == ASCENDING){
-				return constrain(altitude_error / 4, 65, speed);
+				return constrain(altitude_error / 4, 100, 180); // 180cm /s up
 
 			}else if(alt_change_flag == DESCENDING){
-				return constrain(altitude_error / 6, -speed, -10);
+				return constrain(altitude_error / 6, -100, -10); // -100cm /s down
 
 			}else{
 				 return 0;
 			}
 		}
-
-
 
 		public function update_crosstrack():void
 		{
@@ -5148,6 +5168,7 @@
 				gains_button.setLabel("Show Gains");
 			}else{
 				g.visible = true;
+				g.y = 0;
 				gains_button.setLabel("Hide Gains");
 			}
 		}
@@ -5251,7 +5272,7 @@
 			init_rc_out();
 			default_dead_zones();
 			// sets throttle to be at hovering setpoint
-			left_sticks.knob_y.y = 0;
+			//left_sticks.knob_y.y = 0;
 
 			// force sensors to new user defined location of the SIM copter
 			baro.init();
@@ -5313,12 +5334,22 @@
 				do_land();
 
 
-			// force out decent values to the motors
-			apm_rc.outputCh(MOT_1, g.throttle_cruise + 1000);
-			apm_rc.outputCh(MOT_2, g.throttle_cruise + 1000);
-			apm_rc.outputCh(MOT_3, g.throttle_cruise + 1000);
-			apm_rc.outputCh(MOT_4, g.throttle_cruise + 1000);
-			g.rc_3.servo_out = g.throttle_cruise;
+			if(copter.position.z > 0){
+				// force out decent values to the motors
+				apm_rc.outputCh(MOT_1, g.throttle_cruise + 1000);
+				apm_rc.outputCh(MOT_2, g.throttle_cruise + 1000);
+				apm_rc.outputCh(MOT_3, g.throttle_cruise + 1000);
+				apm_rc.outputCh(MOT_4, g.throttle_cruise + 1000);
+				g.rc_3.servo_out = g.throttle_cruise;
+
+			}else{
+
+				apm_rc.outputCh(MOT_1, 1000);
+				apm_rc.outputCh(MOT_2, 1000);
+				apm_rc.outputCh(MOT_3, 1000);
+				apm_rc.outputCh(MOT_4, 1000);
+				g.rc_3.servo_out = 0;
+			}
 		}
 
 
@@ -5418,7 +5449,7 @@
 			*/
 
 			// The Baseball fields at GGPark, monocole interview
-			/*
+			//*
 			wp_manager.clearWaypoints();
 			wp_manager.lat_offset = 377679251;
 			wp_manager.lng_offset = -1224646698;
@@ -5430,8 +5461,10 @@
 			wp_manager.addWaypoint(16, 0, 0, 720, 377678907, -1224648277);
 			wp_manager.addWaypoint(16, 0, 0, 375, 377678559, -1224646056);
 			wp_manager.addWaypoint(21, 0, 0, -265, 377678411, -1224645601);
-			*/
+			//*/
 
+
+			/*
 			//Tilt test
 			wp_manager.clearWaypoints();
 			wp_manager.lat_offset =  	0; //y
@@ -5448,8 +5481,7 @@
 			wp_manager.addWaypoint(115, 0, 1, 720, 45, 1);					// 6 do condition yaw angle: speed, direction (-1,1), rel (1), abs (0),
 			//wp_manager.addWaypoint(16, 0, 0, 1000, 1, 1);
 			wp_manager.addWaypoint(20, 0, 0, 0, 0, 0);						// 7 RTL
-			//wp_manager.update();
-
+			*/
 			// AP Command enumeration
 			/*
 			public const MAV_CMD_NAV_WAYPOINT			:int = 16;
@@ -5714,6 +5746,15 @@
 			failsafe 			= false;
 			failsafeCounter		= 0;
 			radio_failure 		= false;
+
+			ch_1_pwm			= 1500;
+			ch_2_pwm			= 1500;
+			ch_3_pwm			= 1000;
+			ch_4_pwm			= 1500;
+			ch_5_pwm			= 1500;
+			ch_6_pwm			= 1900;
+			ch_7_pwm			= 1100;
+
 		}
 
 
@@ -5748,7 +5789,13 @@
 		{
 			switch(k.keyCode){
 				case 118:  // F7 or channel 7
-					ch_7_pwm = 1900;
+					if(ch_7_pwm >= 1500){
+						trace("ch_7_pwm LOW")
+						ch_7_pwm = 1200;
+					}else{
+						trace("ch_7_pwm HIGH")
+						ch_7_pwm = 1900;
+					}
 					break;
 			}
 
@@ -5756,7 +5803,7 @@
 
 		private function keyUpHandler(k:KeyboardEvent):void
 		{
-			//trace(k.keyCode);
+			trace(k.keyCode);
 
 			if(k.shiftKey){
 				switch(k.keyCode){
@@ -5830,7 +5877,7 @@
 					break;
 
 				case 118:  // F7 or channel 7
-					ch_7_pwm = 1200;
+					//ch_7_pwm = 1200;
 					break;
 
 				case 70: // f for fail
@@ -5843,7 +5890,6 @@
 					break;
 
 				case 72: // h for hover
-					//rc_throttle.knob.x = 0;
 					left_sticks.knob_y.y = 0;
 
 					break;

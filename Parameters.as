@@ -129,7 +129,7 @@ package com {
 		private var alt_hold_i				:Number = 0.038
 		private var alt_hold_imax			:Number = 300;
 		private var throttle_rate_p			:Number = .4
-		private var throttle_rate_i			:Number = 0.1;
+		private var throttle_rate_i			:Number = 0.05;
 		private var throttle_rate_d			:Number = 0.0;
 		private var throttle_rate_imax		:Number = 300;
 		public var alt_comp					:int = 30;
@@ -146,9 +146,9 @@ package com {
 		public var z_offset_correction		:Number = 0.00004;
 		public var z_pos_correction			:Number = 0.2;
 
-		public var accel_bias_x				:Number = .9;
-		public var accel_bias_z				:Number = .9;
-		public var accel_bias_y				:Number = .9;
+		public var accel_bias_x				:Number = 1;
+		public var accel_bias_z				:Number = 1;
+		public var accel_bias_y				:Number = 1;
 
 		// -----------------------------------------
 		// Loiter
@@ -244,10 +244,10 @@ package com {
 		//public var ch7_option				:int		= 1; // CH7_SET_HOVER 1
 		//public var ch7_option				:int		= 2; // CH7_FLIP 2
 		//public var ch7_option				:int		= 3; // CH7_SIMPLE_MODE 3
-		public var ch7_option				:int		= 4; // CH7_RTL 4
+		//public var ch7_option				:int		= 4; // CH7_RTL 4
 		//public var ch7_option				:int		= 5; // CH7_AUTO_TRIM 5
 		//public var ch7_option				:int		= 6; // CH7_ADC_FILTER 6
-		//public var ch7_option				:int		= 7; // CH7_SAVE_WP 7
+		public var ch7_option				:int		= 7; // CH7_SAVE_WP 7
 
 		public var auto_slew_rate			:Number 	= 30;
 

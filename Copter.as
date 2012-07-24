@@ -100,7 +100,6 @@
 			motor_filter_1	= new AverageFilter(g.esc_delay);
 			motor_filter_2	= new AverageFilter(g.esc_delay);
 			motor_filter_3	= new AverageFilter(g.esc_delay);
-
 			motor_filter_0.force_sample(c);
 			motor_filter_1.force_sample(c);
 			motor_filter_2.force_sample(c);
@@ -117,7 +116,8 @@
 		{
 			var _thrust	:Number = 0;
 			rot_accel = new Vector3D(0,0,0);
-			angle3D.x = angle3D.y = 0;
+			angle3D.x = 0
+			angle3D.y = 0;
 			angle3D.z = 1;
 
 			wind = windGenerator.read();
