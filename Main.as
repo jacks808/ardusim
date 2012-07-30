@@ -41,7 +41,7 @@
 	import com.Sonar;
 	import com.Motors;
 	import com.Relay;
-	import com.APM_RC;
+	import com.AP_RC;
 	import com.User;
 	import com.WaypointManager;
 
@@ -61,7 +61,7 @@
 		public var copter							:Copter;
 		public var ahrs								:AHRS;
 		public var relay							:Relay;
-		public var apm_rc							:APM_RC;
+		public var APM_RC							:AP_RC;
 		public var failsafe							:Boolean = false;
 		public var radio_failure					:Boolean = false;
 		//public var lng_offset						:Number = -1224646763;
@@ -131,6 +131,7 @@
 		public var ch_5_pwm							:int = 1500;
 		public var ch_6_pwm							:int = 1500;
 		public var ch_7_pwm							:int = 1500;
+		public var ch_8_pwm							:int = 1500;
 
 		public var throttle_integrator				:int = 0;
 
@@ -156,8 +157,6 @@
 		public const WP_MODE						:int = 2;
 		public const CIRCLE_MODE					:int = 3;
 		public const NO_NAV_MODE					:int = 4;
-		public const TOY_MODE						:int = 5;	// THOR This mode defines the Virtual WP following mode
-
 
 		public const YAW_HOLD 						:int = 0;
 		public const YAW_ACRO 						:int = 1;
@@ -273,7 +272,9 @@
 		public const CH7_AUTO_TRIM 					:int = 5;
 		public const CH7_ADC_FILTER 				:int = 6;
 		public const CH7_SAVE_WP 					:int = 7;
+		public const CH7_TOY 						:int = 8;
 		public const CH_7_PWM_TRIGGER 	 			:int = 1800
+		public const CH_6_PWM_TRIGGER 	 			:int = 1500
 
 		// --------------------------------------
 		// Timers
@@ -379,12 +380,8 @@
 		////////////////////////////////////////////////////////////////////////////////
 		// Toy Mode
 		////////////////////////////////////////////////////////////////////////////////
-		public const TOY_DELAY						:int = 500;	// Equal to 1.5 s at 100hz
-		public var toy_input_timer					:int = 0; 	// A delay timer to engage loiter or WP mode
-		public var toy_speed						:int = 0; 	// TO remember how fast we are going when we enage WP mode
 		public var toy_lookup						:Array;
 		public var toy_alt							:int = -1;
-		public var toy_alt_hold						:Boolean;
 
 
 		// -----------------------------------------
@@ -408,7 +405,7 @@
 		// The orginal altitude used to base our new altitude during decent
 		public var original_altitude				:Number = 0;
 		// Used to track the altitude offset for climbrate control
-		public var target_altitude					:Number = 0;
+		//public var target_altitude					:Number = 0;
 		public var alt_change_timer					:Number = 0;
 		public var alt_change_flag					:int = 0;
 		public var alt_change						:Number = 0;
@@ -585,7 +582,7 @@
 			user 					= new User(); // recorded flight input
 			copter 					= new Copter(); // recorded flight input
 			ahrs					= new AHRS();
-			apm_rc					= new APM_RC();
+			APM_RC					= new AP_RC();
 			g_gps					= new GPS(copter.loc);
 			baro					= new Baro(copter.loc);
 			sonar					= new Sonar(copter.loc);
@@ -617,7 +614,7 @@
 			motor_out				= new Array();
 
 			copter.ahrs				= ahrs;
-			copter.apm_rc			= apm_rc;
+			copter.APM_RC			= APM_RC;
 
 			// AP queues
 			command_nav_queue 		= new Location();
@@ -832,8 +829,8 @@
 			//right_sticks.sticky_x = true;
 			//right_sticks.sticky_y = true;
 			left_sticks.sticky_y = true;
-			left_sticks.sticky_x = true;
-			//left_sticks.knob_y.y = 100;
+			left_sticks.sticky_x = false;
+			left_sticks.knob_y.y = 11;
 
 			init_sim();
 
@@ -1246,7 +1243,9 @@
 							nav_yaw = ahrs.yaw_sensor;
 						}
 					}else{
-						nav_yaw = get_nav_yaw_offset(g.rc_4.control_in, g.rc_3.control_in);
+						if(motors.armed == false)
+							nav_yaw = ahrs.yaw_sensor;
+
 						g.rc_4.servo_out = get_stabilize_yaw(nav_yaw);
 					}
 					return;
@@ -1434,7 +1433,7 @@
 						// calc average throttle
 						if ((g.rc_3.control_in > g.throttle_min) && Math.abs(climb_rate_avg) < 40){
 							throttle_avg = throttle_avg * .99 + g.rc_3.control_in * .01;
-							g.throttle_cruise = throttle_avg;
+							//g.throttle_cruise = throttle_avg;
 						}
 
 						if (takeoff_complete == false && motors.armed){
@@ -1773,7 +1772,7 @@
 			current_loc.alt = Math.floor(current_loc.alt);
 
 			// update the target altitude
-			next_WP.alt = get_new_altitude();
+			verify_altitude();
 
 			// get an average climb_rate for throttle cruise calc
 			climb_rate_avg = (climb_rate_avg * 7 + climb_rate_actual) / 8;
@@ -1899,9 +1898,6 @@
 				// XXX Finish and Sync
 				//limit_pitch_and_roll(altitude_error);
 
-
-			}else if(wp_control == TOY_MODE){ // THOR added to navigate to Virtual WP
-				calc_nav_rate(toy_speed);
 
 			}else if(wp_control == NO_NAV_MODE){
 				// clear out our nav so we can do things like land straight down
@@ -2274,13 +2270,6 @@
 		// The function call for managing the flight mode Toy
 		public function roll_pitch_toy():void
 		{
-			var manual_control:Boolean = false;
-
-			if(g.rc_2.control_in != 0){
-				// If we pitch forward or back, resume manually control
-				manual_control  = true;
-			}
-
 			// Yaw control - Yaw is always available, and will NOT exit the
 			// user from Loiter mode
 			var yaw_rate:int = g.rc_1.control_in / g.toy_yaw_rate;
@@ -2289,51 +2278,33 @@
 				g.rc_4.servo_out = get_acro_yaw(yaw_rate/2);
 				yaw_stopped = false;
 				yaw_timer = 150;
+
 			}else if (!yaw_stopped){
 				g.rc_4.servo_out = get_acro_yaw(0);
 				yaw_timer--;
+
 				if(yaw_timer == 0){
 					yaw_stopped = true;
 					nav_yaw = ahrs.yaw_sensor;
 				}
+
 			}else{
-				nav_yaw = get_nav_yaw_offset(yaw_rate, g.rc_3.control_in);
+				if(motors.armed == false)
+					nav_yaw = ahrs.yaw_sensor;
+
 				g.rc_4.servo_out = get_stabilize_yaw(nav_yaw);
 			}
 
+			// roll_rate is the outcome of the linear equation or lookup table
+			// based on speed and Yaw rate
+			var roll_rate:int;
 
-			// We manually set our modes based on the state of Toy mode:
-			// Handle throttle manually
-			if(toy_alt_hold){
-				throttle_mode 	= THROTTLE_HOLD;
-			}else{
-				throttle_mode 	= THROTTLE_MANUAL;
-			}
+			roll_rate = -(g.rc_2.control_in * (yaw_rate/100)) / 40;
+			trace("roll", roll_rate, "yaw_rate", yaw_rate, "yaw in", g.rc_1.control_in);
 
-			if(manual_control){
-				// user is in control: reset count-up timer
-				toy_input_timer = 0;
+			roll_rate = constrain(roll_rate, -3000, 3000);
 
-				// roll_rate is the outcome of the linear equation or lookup table
-				// based on speed and Yaw rate
-				var roll_rate:int;
-
-
-				// Dont try to navigate or integrate a nav error
-				wp_control 		= NO_NAV_MODE;
-
-				//if(g.test == false){
-					// yaw_rate = roll angle
-					// Linear equation for Yaw:Speed to Roll
-					// default is 1000, lower for more roll action
-					//roll_rate = (g_gps.ground_speed / 500) * yaw_rate;
-					// limit roll rate to 15, 30, or 45 deg per second.
-					//roll_rate = constrain(roll_rate, -(4500 / g.toy_yaw_rate), (4500 / g.toy_yaw_rate));
-					roll_rate = (g.rc_2.control_in * (yaw_rate/100)) /40;
-					roll_rate = constrain(roll_rate, -2500, 2500);
-					trace("roll_rate", roll_rate);
-
-				/*}else{
+			/*
 					// Lookup value
 					var xx:int = g_gps.ground_speed / 200;
 					var yy:int = Math.abs(yaw_rate / 500);
@@ -2349,212 +2320,44 @@
 						roll_rate = -roll_rate;
 
 					roll_rate = constrain(roll_rate, -(4500 / g.toy_yaw_rate), (4500 / g.toy_yaw_rate));
+			*/
 
-				}*/
+			// Output the attitude
+			g.rc_1.servo_out = get_stabilize_roll(roll_rate);
+			g.rc_2.servo_out = get_stabilize_pitch(0); //  no pitch control
 
-				// Output the attitude
-				g.rc_1.servo_out = get_stabilize_roll(roll_rate);
-				g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in);
-
+			// EDF control:
+			if(g.rc_2.radio_in >= 1550){
+				g.rc_8.radio_out = 1000 + ((g.rc_2.radio_in - 1550) * 100) / 45;
+			}else if(g.rc_2.radio_in <= 1450){
+				g.rc_8.radio_out = 1000 + ((1450 - g.rc_2.radio_in) * 100) / 45;
 			}else{
-				// No user input
-				// Count-up to decision tp Loiter
-				toy_input_timer++;
-
-				if ((wp_control != LOITER_MODE) && ((g_gps.ground_speed < 150) || (toy_input_timer == TOY_DELAY))){
-					//no user input, lets enter loiter
-					trace("Enter Toy Loiter", g_gps.ground_speed);
-
-					// resets so we don't overflow the timer
-					toy_input_timer = TOY_DELAY;
-
-					// clear our I terms for Nav or we will carry over old values
-					reset_wind_I();
-					reset_nav_params();
-
-					// loiter
-					wp_control 	= LOITER_MODE;
-
-					// we are in an alt hold throttle with manual override
-					//throttle_mode 	= THROTTLE_HOLD;
-
-					set_next_WP(current_loc);
-				}
-
-				if(wp_control == LOITER_MODE){
-					// prevent timer overflow
-					toy_input_timer = TOY_DELAY;
-
-					//trace("loiter control" ,g_gps.ground_speed);
-					g.rc_1.servo_out 	= get_stabilize_roll(auto_roll);
-					g.rc_2.servo_out 	= get_stabilize_pitch(auto_pitch);
-				}else{
-					//trace("Coast" ,g_gps.ground_speed);
-					// Coast
-					g.rc_1.servo_out 	= get_stabilize_roll(0);
-					g.rc_2.servo_out 	= get_stabilize_pitch(0);
-				}
+				g.rc_8.radio_out = 1000;
 			}
+
+			APM_RC.OutputCh(CH_8, g.rc_8.radio_out); // 1000 : 2000
+
+			if(g.rc_2.radio_in > 1450){
+				copter.edf = 1000 - g.rc_8.radio_out;
+				APM_RC.OutputCh(CH_6, 1000); // 1000 : 2000
+				}else{
+				copter.edf = g.rc_8.radio_out - 1000;
+				APM_RC.OutputCh(CH_6, 2000); // less than 1450
+			}
+
+			//trace("8 out:", g.rc_8.radio_out);
 		}
 
-
-		// THOR
-		// The function call for managing the flight mode Toy
-		public function roll_pitch_toy1():void
-		{
-			var manual_control:Boolean = false;
-
-			if(g.rc_2.control_in != 0){ // pitch
-				manual_control  = true;
-
-			}else if(g.rc_1.control_in != 0){ // Roll/Yaw combo
-				// we have some user input
-				if(wp_control == TOY_MODE){
-					// we are heading to Virtual WP
-					manual_control  = true;
-				}else{
-					// we are in manual control
-					manual_control  = false;
-				}
-			}
-
-			// Yaw control - Yaw is always available, and will NOT exit the
-			// user from Loiter mode
-			var yaw_rate:int = g.rc_1.control_in / g.toy_yaw_rate;
-			nav_yaw += yaw_rate / 100;
-			nav_yaw = wrap_360(nav_yaw);
-			g.rc_4.servo_out = get_stabilize_yaw(nav_yaw);
-
-			if(manual_control){
-				// user is in control: reset count-up timer
-				toy_input_timer = 0;
-
-				// roll_rate is the outcome of the linear equation or lookup table
-				// based on speed and Yaw rate
-				var roll_rate:int;
-
-				// We manually set out modes based on the state of Toy mode:
-				// Handle throttle manually
-				throttle_mode 	= THROTTLE_MANUAL;
-				// Dont try to navigate or integrate a nav error
-				wp_control 		= NO_NAV_MODE;
-
-				if(g.test == false){
-				// yaw_rate = roll angle
-				// Linear equation for Yaw:Speed to Roll
-				// default is 1000, lower for more roll action
-				roll_rate = (g_gps.ground_speed / 1000) * yaw_rate;
-				// limit roll rate to 15, 30, or 45 deg per second.
-				roll_rate = constrain(roll_rate, -(4500 / g.toy_yaw_rate), (4500 / g.toy_yaw_rate));
-
-				}else{
-
-				// Lookup value
-				var xx:int = g_gps.ground_speed / 200;
-				var yy:int = Math.abs(yaw_rate / 500);
-
-				xx = constrain(xx, 0, 3);
-				yy = constrain(yy, 0, 8);
-
-				roll_rate = toy_lookup[yy * 4 + xx];
-
-				if(yaw_rate == 0)
-					roll_rate = 0;
-				else if(yaw_rate < 0)
-					roll_rate = -roll_rate;
-
-				roll_rate = constrain(roll_rate, -(4500 / g.toy_yaw_rate), (4500 / g.toy_yaw_rate));
-
-				}
-				// Output the attitude
-				g.rc_1.servo_out = get_stabilize_roll(roll_rate);
-				g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in);
-
-			}else{
-				// No user input
-				// Count-up to decision - Loiter or Virtual WP
-				toy_input_timer++;
-
-				if (toy_input_timer == TOY_DELAY){
-
-					// clear our I terms for Nav or we will carry over old values
-					reset_wind_I();
-
-					if (g_gps.ground_speed < 200) {
-						// loiter
-						wp_control = LOITER_MODE;
-						set_next_WP(current_loc);
-
-					}else{
-						// hold velocity and
-						// calc a new WP 10000cm ahead (Approximate)
-						var tmp:Location = new Location();
-						tmp.lng = current_loc.lng + (10000 * cos_yaw_x);  	// X or East/West
-						tmp.lat = current_loc.lat + (10000 * sin_yaw_y);	// Y or North/South
-						tmp.alt = current_loc.alt;
-						set_next_WP(tmp);
-
-						// A special navigation mode for Toy mode that maintains the entry speed
-						wp_control 	= TOY_MODE;
-						// Save our speed as we entered the mode
-						toy_speed 	= g_gps.ground_speed;
-					}
-
-					// Just level out until we hit 1.5s
-					g.rc_1.servo_out 	= get_stabilize_roll(0);
-					g.rc_2.servo_out 	= get_stabilize_pitch(0);
-
-				}else if (toy_input_timer > TOY_DELAY){
-					// we are in an alt hold throttle with manual override
-					throttle_mode 	= THROTTLE_HOLD;
-					// resets so we don't overflow the timer
-					toy_input_timer = TOY_DELAY;
-
-					// outputs the needed nav_control to maintain speed and direction
-					g.rc_1.servo_out 	= get_stabilize_roll(auto_roll);
-					g.rc_2.servo_out 	= get_stabilize_pitch(auto_pitch);
-
-				}else{
-
-					// outputs the needed nav_control to maintain speed and direction
-					g.rc_1.servo_out 	= get_stabilize_roll(0);
-					g.rc_2.servo_out 	= get_stabilize_pitch(0);
-				}
-			}
-		}
 
 		/*************************************************************
 		throttle control
 		****************************************************************/
 
-		public function get_nav_yaw_offset(yaw_input:int, reset:int):Number
-		{
-			var _yaw:Number = 0;
-
-			if(reset == 0){
-				// we are on the ground
-				return ahrs.yaw_sensor;
-
-			}else{
-				// re-define nav_yaw if we have stick input
-				if(yaw_input != 0){
-					// set nav_yaw + or - the current location
-					_yaw = yaw_input + ahrs.yaw_sensor;
-					// we need to wrap our value so we can be 0 to 360 (*100)
-					return wrap_360(_yaw);
-				} else{
-
-					// no stick input, lets not change nav_yaw
-					return nav_yaw;
-				}
-			}
-		}
-
 		public function get_angle_boost(value:Number):Number
 		{
 			var temp:Number = cos_pitch_x * cos_roll_x;
-			temp = constrain(temp, .5, 1.0);
-			return ((g.throttle_cruise + 80) / temp) - (g.throttle_cruise + 80);
+			temp = constrain(temp, 0, 1.0);
+			return ((g.throttle_cruise) / temp) - (g.throttle_cruise);
 		}
 
 		// -----------------------------------------------------------------------------------
@@ -2985,7 +2788,7 @@
 			loiter_time_max = command_nav_queue.p1 * 1000;
 
 			// if we don't require an altitude minimum, we save this flag as passed (1)
-			if((next_WP.options & MASK_OPTIONS_RELATIVE_ALT) == 0){
+			if((next_WP.options & WP_OPTION_ALT_REQUIRED) == 0){
 				// we don't need to worry about it
 				wp_verify_byte |= NAV_ALTITUDE;
 			}
@@ -3076,8 +2879,7 @@
 				return false;
 			}
 			// are we above our target altitude?
-			//return (current_loc.alt > next_WP.alt);
-			return (current_loc.alt > target_altitude);
+			return (current_loc.alt > next_WP.alt);
 		}
 
 		// called at 10hz
@@ -3490,7 +3292,7 @@
 
 		public function do_set_servo():void
 		{
-			//apm_rc.OutputCh(command_cond_queue.p1 - 1, command_cond_queue.alt);
+			//APM_RC.OutputCh(command_cond_queue.p1 - 1, command_cond_queue.alt);
 		}
 
 		public function do_set_relay():void
@@ -3758,11 +3560,46 @@
 		// set this to your trainer switch
 		public function read_trim_switch():void
 		{
+			if(control_mode == TOY){
+				if (g.rc_6.radio_in > CH_6_PWM_TRIGGER){
+					throttle_mode 	= THROTTLE_MANUAL;
+				}else{
+					throttle_mode 	= THROTTLE_AUTO;
+				}
+			}
+
 			do_simple = g.simple_checkbox.getSelected();
 
 			// this is the normal operation set by the mission planner
 			if(g.ch7_option == CH7_SIMPLE_MODE){
 				//do_simple = (g.rc_7.radio_in > CH_7_PWM_TRIGGER);
+
+			}else if(g.ch7_option == CH7_TOY){
+
+				if(trim_flag == false && g.rc_7.radio_in > 1666){
+					trim_flag = true;
+					// go up
+					if(next_WP.alt >= 400){
+						set_new_altitude(next_WP.alt + g.toy_alt_large);
+					}else{
+						set_new_altitude(next_WP.alt + g.toy_alt_small);
+					}
+				}else if(trim_flag == false && g.rc_7.radio_in < 1333){
+					trim_flag = true;
+					// go down
+					if(next_WP.alt >= (400 + g.toy_alt_large)){
+						set_new_altitude(next_WP.alt - g.toy_alt_large);
+					}else if(next_WP.alt >= 100){
+						set_new_altitude(next_WP.alt - g.toy_alt_small);
+					}else if(next_WP.alt < 100){
+						set_new_altitude(0);
+					}
+
+
+				}else if (trim_flag){
+					trim_flag = false;
+				}
+
 
 			}else if (g.ch7_option == CH7_FLIP){
 				if (trim_flag == false && g.rc_7.radio_in > CH_7_PWM_TRIGGER){
@@ -3771,6 +3608,7 @@
 					if(g.rc_3.control_in != 0 && takeoff_complete)
 						init_flip();
 				}
+
 				if (trim_flag == true && g.rc_7.control_in < 800){
 					trim_flag = false;
 				}
@@ -3876,7 +3714,8 @@
 						//next_WP.alt += 1000;
 						set_new_altitude(next_WP.alt + 1000);
 					}
-					// 2 = Stay in AUTO and ignore failsafe
+					//if (g.throttle_fs_action == 2)
+					//  Stay in AUTO and ignore failsafe
 					break;
 
 				default:
@@ -3886,7 +3725,7 @@
 						set_mode(RTL);
 						// We add an additional 10m to the current altitude
 						//next_WP.alt += 1000;
-						set_new_altitude(target_altitude + 1000);
+						set_new_altitude(next_WP.alt + 1000);
 					}else{
 						// We have no GPS so we must land
 						set_mode(LAND);
@@ -3910,7 +3749,6 @@
 				// --------------------------------------------------------
 				reset_control_switch();
 
-
 			}else if (g.throttle_fs_action == 1){
 				// We're back in radio contact
 				// return to Home
@@ -3919,6 +3757,7 @@
 				set_mode(RTL);
 			}
 		}
+
 
 		public function low_battery_event():void
 		{
@@ -3945,9 +3784,9 @@
 
 				if (event_id >= CH_5 && event_id <= CH_8) {
 					if(event_repeat%2) {
-						apm_rc.OutputCh(event_id, event_value); // send to Servos
+						APM_RC.OutputCh(event_id, event_value); // send to Servos
 					} else {
-						apm_rc.OutputCh(event_id, event_undo_value);
+						APM_RC.OutputCh(event_id, event_undo_value);
 					}
 				}
 
@@ -4309,10 +4148,10 @@
 			}
 
 
-			apm_rc.outputCh(MOT_1, motor_out[MOT_1]);
-			apm_rc.outputCh(MOT_2, motor_out[MOT_2]);
-			apm_rc.outputCh(MOT_3, motor_out[MOT_3]);
-			apm_rc.outputCh(MOT_4, motor_out[MOT_4]); // 1000 : 2000
+			APM_RC.OutputCh(MOT_1, motor_out[MOT_1]);
+			APM_RC.OutputCh(MOT_2, motor_out[MOT_2]);
+			APM_RC.OutputCh(MOT_3, motor_out[MOT_3]);
+			APM_RC.OutputCh(MOT_4, motor_out[MOT_4]); // 1000 : 2000
 		}
 
 		public function output_motors_disarmed()
@@ -4324,10 +4163,10 @@
 			}
 
 			// Send commands to motors
-			apm_rc.outputCh(CH_1, g.rc_3.radio_min);
-			apm_rc.outputCh(CH_2, g.rc_3.radio_min);
-			apm_rc.outputCh(CH_3, g.rc_3.radio_min);
-			apm_rc.outputCh(CH_4, g.rc_3.radio_min);
+			APM_RC.OutputCh(CH_1, g.rc_3.radio_min);
+			APM_RC.OutputCh(CH_2, g.rc_3.radio_min);
+			APM_RC.OutputCh(CH_3, g.rc_3.radio_min);
+			APM_RC.OutputCh(CH_4, g.rc_3.radio_min);
 
 		}
 
@@ -4628,7 +4467,7 @@
 		public function get_desired_climb_rate():Number
 		{
 			if(alt_change_flag == ASCENDING){
-				return constrain(altitude_error / 4, 100, 180); // 180cm /s up
+				return constrain(altitude_error / 4, 10, 180); // 180cm /s up
 
 			}else if(alt_change_flag == DESCENDING){
 				return constrain(altitude_error / 6, -100, -10); // -100cm /s down
@@ -4653,7 +4492,7 @@
 			// Next_WP alt is our target alt
 			// It changes based on climb rate
 			// until it reaches the target_altitude
-			return target_altitude - current_loc.alt;
+			return next_WP.alt - current_loc.alt;
 		}
 
 		public function clear_new_altitude():void
@@ -4664,115 +4503,40 @@
 		public function force_new_altitude(_new_alt:Number):void
 		{
 			next_WP.alt 	= _new_alt;
-			target_altitude = _new_alt;
 			alt_change_flag = REACHED_ALT;
 		}
 
 		public function set_new_altitude(_new_alt:Number):void
 		{
-			if(_new_alt == current_loc.alt){
-				force_new_altitude(_new_alt);
-				return;
-			}
+			next_WP.alt 	= _new_alt;
 
-			// We start at the current location altitude and gradually change alt
-			next_WP.alt = current_loc.alt;
-
-			// for calculating the delta time
-			alt_change_timer = millis();
-
-			// save the target altitude
-			target_altitude = _new_alt;
-
-			// reset our altitude integrator
-			alt_change = 0;
-
-			// save the original altitude
-			original_altitude = current_loc.alt;
-
-			// to decide if we have reached the target altitude
-			if(target_altitude > original_altitude){
+			if(next_WP.alt > current_loc.alt + 50){
 				// we are below, going up
 				alt_change_flag = ASCENDING;
-				//Serial.printf("go up\n");
-			}else if(target_altitude < original_altitude){
+
+			}else if(next_WP.alt < current_loc.alt - 50){
 				// we are above, going down
 				alt_change_flag = DESCENDING;
-				//Serial.printf("go down\n");
 			}else{
 				// No Change
 				alt_change_flag = REACHED_ALT;
-				//Serial.printf("reached alt\n");
 			}
-			//Serial.printf("new alt: %d Org alt: %d\n", target_altitude, original_altitude);
 		}
 
-		public function get_new_altitude():Number
+		public function verify_altitude():void
 		{
-			// returns a new next_WP.alt
 
 			if(alt_change_flag == ASCENDING){
 				// we are below, going up
-				if(current_loc.alt >  target_altitude){
+				if(current_loc.alt >  next_WP.alt){
 					alt_change_flag = REACHED_ALT;
-				}
-
-				// we shouldn't command past our target
-				if(next_WP.alt >=  target_altitude){
-					return target_altitude;
 				}
 			}else if (alt_change_flag == DESCENDING){
 				// we are above, going down
-				if(current_loc.alt <=  target_altitude)
+				if(current_loc.alt <=  next_WP.alt)
 					alt_change_flag = REACHED_ALT;
-
-				// we shouldn't command past our target
-				if(next_WP.alt <=  target_altitude){
-					return target_altitude;
 				}
 			}
-
-			// if we have reached our target altitude, return the target alt
-			if(alt_change_flag == REACHED_ALT){
-				return target_altitude;
-			}
-
-			var diff:Number 	= Math.abs(next_WP.alt - target_altitude);
-			// scale is how we generate a desired rate from the elapsed time
-			// a smaller scale means faster rates
-			var _scale:Number 	= 4;
-
-			if (next_WP.alt < target_altitude){
-				// we are below the target alt
-				if(diff < 200){
-					_scale = 4;
-				} else {
-					_scale = 3;
-				}
-			}else {
-				// we are above the target, going down
-				if(diff < 400){
-					_scale = 5;
-				}
-				if(diff < 100){
-					_scale = 6;
-				}
-			}
-
-			// we use the elapsed time as our altitude offset
-			// 1000 = 1 sec
-			// 1000 >> 4 = 64cm/s descent by default
-			var change:Number = (millis() - alt_change_timer) >> _scale;
-
-			if(alt_change_flag == ASCENDING){
-				alt_change += change;
-			}else{
-				alt_change -= change;
-			}
-			// for generating delta time
-			alt_change_timer = millis();
-			return original_altitude + alt_change;
-		}
 
 		public function get_distance(loc1:Location, loc2:Location):Number
 		{
@@ -4812,6 +4576,15 @@
 
 		public function init_rc_in():void
 		{
+			g.rc_1.channel_num = 1;
+			g.rc_2.channel_num = 2;
+			g.rc_3.channel_num = 3;
+			g.rc_4.channel_num = 4;
+			g.rc_5.channel_num = 5;
+			g.rc_6.channel_num = 6;
+			g.rc_7.channel_num = 7;
+			g.rc_8.channel_num = 8;
+
 			// set rc channel ranges
 			g.rc_1.set_angle(4500);
 			g.rc_2.set_angle(4500);
@@ -4821,16 +4594,14 @@
 			// reverse: CW = left
 			// normal:  CW = left???
 
-			g.rc_1.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
-			g.rc_2.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
-			g.rc_4.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
-
 			//set auxiliary ranges
 			g.rc_5.set_range(0,1000);
 			g.rc_6.set_range(0,1000);
 			g.rc_7.set_range(0,1000);
-			//g.rc_8.set_range(0,1000);
 
+			g.rc_1.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
+			g.rc_2.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
+			g.rc_4.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
 		}
 
 		public function init_rc_out():void
@@ -4840,20 +4611,20 @@
 
 		public function read_radio():void
 		{
-			if (apm_rc.getState() == 1){
+			if (APM_RC.getState() == 1){
 				new_radio_frame = true;
 
-				g.rc_1.set_pwm(apm_rc.InputCh(CH_1));
-				g.rc_2.set_pwm(apm_rc.InputCh(CH_2));
-				g.rc_4.set_pwm(apm_rc.InputCh(CH_4));
-				g.rc_5.set_pwm(apm_rc.InputCh(CH_5));
-				g.rc_6.set_pwm(apm_rc.InputCh(CH_6));
-				g.rc_7.set_pwm(apm_rc.InputCh(CH_7));
-				g.rc_8.set_pwm(apm_rc.InputCh(CH_8));
+				g.rc_1.set_pwm(APM_RC.InputCh(CH_1));
+				g.rc_2.set_pwm(APM_RC.InputCh(CH_2));
+				g.rc_4.set_pwm(APM_RC.InputCh(CH_4));
+				g.rc_5.set_pwm(APM_RC.InputCh(CH_5));
+				g.rc_6.set_pwm(APM_RC.InputCh(CH_6));
+				g.rc_7.set_pwm(APM_RC.InputCh(CH_7));
+				g.rc_8.set_pwm(APM_RC.InputCh(CH_8));
 
 				// throttle
 				// XXX SYNC - failsafe dropout fix
-				var tmp:int = apm_rc.InputCh(CH_3);
+				var tmp:int = APM_RC.InputCh(CH_3);
 				if(tmp > g.throttle_fs_value)
 					g.rc_3.set_pwm(tmp);
 
@@ -5336,18 +5107,18 @@
 
 			if(copter.position.z > 0){
 				// force out decent values to the motors
-				apm_rc.outputCh(MOT_1, g.throttle_cruise + 1000);
-				apm_rc.outputCh(MOT_2, g.throttle_cruise + 1000);
-				apm_rc.outputCh(MOT_3, g.throttle_cruise + 1000);
-				apm_rc.outputCh(MOT_4, g.throttle_cruise + 1000);
+				APM_RC.OutputCh(MOT_1, g.throttle_cruise + 1000);
+				APM_RC.OutputCh(MOT_2, g.throttle_cruise + 1000);
+				APM_RC.OutputCh(MOT_3, g.throttle_cruise + 1000);
+				APM_RC.OutputCh(MOT_4, g.throttle_cruise + 1000);
 				g.rc_3.servo_out = g.throttle_cruise;
 
 			}else{
 
-				apm_rc.outputCh(MOT_1, 1000);
-				apm_rc.outputCh(MOT_2, 1000);
-				apm_rc.outputCh(MOT_3, 1000);
-				apm_rc.outputCh(MOT_4, 1000);
+				APM_RC.OutputCh(MOT_1, 1000);
+				APM_RC.OutputCh(MOT_2, 1000);
+				APM_RC.OutputCh(MOT_3, 1000);
+				APM_RC.OutputCh(MOT_4, 1000);
 				g.rc_3.servo_out = 0;
 			}
 		}
@@ -5449,7 +5220,7 @@
 			*/
 
 			// The Baseball fields at GGPark, monocole interview
-			//*
+			/*
 			wp_manager.clearWaypoints();
 			wp_manager.lat_offset = 377679251;
 			wp_manager.lng_offset = -1224646698;
@@ -5515,6 +5286,43 @@
 			public const MAV_ROI_TARGET					:int = 4;
 			public const MAV_ROI_ENUM_END				:int = 5;
 			*/
+
+			// Marco's issue:
+			wp_manager.clearWaypoints();
+			wp_manager.lat_offset =  448070247;
+			wp_manager.lng_offset =  116106438;
+			wp_manager.addWaypoint(16, 1, 0, 2000, 448071360, 116112808);
+
+			/*
+			wp_manager.clearWaypoints();
+			wp_manager.lat_offset =  397151280;
+			wp_manager.lng_offset = -1052041650;
+			wp_manager.addWaypoint(22, 1, 0, 1000, 0, 0);
+									//  o  p1  alt	lat			lon
+			wp_manager.addWaypoint(16, 1, 0, 1000, 397154624, -1052041600);
+			wp_manager.addWaypoint(16, 1, 0, 2000, 397155104, -1052037184);
+			wp_manager.addWaypoint(16, 1, 0, 3000, 397145312, -1052032704);
+			wp_manager.addWaypoint(16, 1, 0, 4000, 397143200, -1052018496);
+			wp_manager.addWaypoint(16, 1, 0, 2000, 397133056, -1052002816);
+			wp_manager.addWaypoint(16, 1, 0, 2000, 397131072, -1052004992);
+			wp_manager.addWaypoint(16, 1, 0, 2000, 397133376, -1052008512);
+			wp_manager.addWaypoint(16, 1, 0, 2000, 397130496, -1052011712);
+			wp_manager.addWaypoint(16, 1, 0, 2000, 397136864, -1052021696);
+			wp_manager.addWaypoint(16, 1, 0, 4000, 397139040, -1052023232);
+			wp_manager.addWaypoint(16, 1, 0, 4000, 397149344, -1052028288);
+			wp_manager.addWaypoint(16, 1, 0, 600, 397151296, -1052042112);
+			wp_manager.addWaypoint(16, 1, 0, 5000, 397161472, -1052046656);
+			wp_manager.addWaypoint(16, 1, 0, 5000, 397163936, -1052050368);
+			wp_manager.addWaypoint(16, 1, 0, 5000, 397162080, -1052052352);
+			wp_manager.addWaypoint(16, 1, 0, 5000, 397159648, -1052048896);
+			wp_manager.addWaypoint(16, 1, 0, 4000, 397157376, -1052051328);
+			wp_manager.addWaypoint(16, 1, 0, 2000, 397155616, -1052037952);
+			wp_manager.addWaypoint(16, 1, 0, 800, 397151712, -1052042304);
+			wp_manager.addWaypoint(16, 1, 0, 500, 397154496, -1052042752);
+			wp_manager.addWaypoint(16, 1, 0, 800, 397154592, -1052042112);
+			wp_manager.addWaypoint(21, 1, 0, 0, 0, 0);
+			*/
+
 		}
 
 		private function init_sim():void
@@ -5574,7 +5382,6 @@
 			loiter_time						= 0;
 			loiter_time_max					= 0;
 
-			toy_alt_hold					= false;
 			sky.toy_alt_hold_MC.visible		= false;
 
 			// -----------------------------------------
@@ -5591,7 +5398,6 @@
 			// Climb rate control
 			// -----------------------------------------
 			original_altitude				= 0;
-			target_altitude					= 0;
 			alt_change_timer				= 0;
 			alt_change_flag					= 0;
 			alt_change						= 0;
@@ -5752,8 +5558,8 @@
 			ch_3_pwm			= 1000;
 			ch_4_pwm			= 1500;
 			ch_5_pwm			= 1500;
-			ch_6_pwm			= 1900;
-			ch_7_pwm			= 1100;
+			ch_6_pwm			= 1100;
+			ch_7_pwm			= 1500;
 
 		}
 
@@ -5771,15 +5577,16 @@
 				ch_3_pwm = 3000 - left_sticks.pwm_y; // reversed
 				ch_4_pwm = left_sticks.pwm_x;
 			}
+			//trace("ch_3_pwm",ch_3_pwm);
 
-			apm_rc.set_PWM_channel(ch_1_pwm,	 	CH_1);
-			apm_rc.set_PWM_channel(ch_2_pwm, 		CH_2);
-			apm_rc.set_PWM_channel(ch_3_pwm,	 	CH_3);
-			apm_rc.set_PWM_channel(ch_4_pwm, 		CH_4);
-			apm_rc.set_PWM_channel(ch_5_pwm, 		CH_5);
-			apm_rc.set_PWM_channel(ch_6_pwm, 		CH_6);
-			apm_rc.set_PWM_channel(ch_7_pwm, 		CH_7);
-			//apm_rc.set_PWM_channel(ch_8_pwm, 		CH_8); // not used
+			APM_RC.set_PWM_channel(ch_1_pwm,	 	CH_1);
+			APM_RC.set_PWM_channel(ch_2_pwm, 		CH_2);
+			APM_RC.set_PWM_channel(ch_3_pwm,	 	CH_3);
+			APM_RC.set_PWM_channel(ch_4_pwm, 		CH_4);
+			APM_RC.set_PWM_channel(ch_5_pwm, 		CH_5);
+			APM_RC.set_PWM_channel(ch_6_pwm, 		CH_6);
+			APM_RC.set_PWM_channel(ch_7_pwm, 		CH_7);
+			APM_RC.set_PWM_channel(ch_8_pwm, 		CH_8); // not used
 		}
 
 		// -----------------------------------------------------------------------------------
@@ -5788,13 +5595,30 @@
 		private function keyDownHandler(k:KeyboardEvent):void
 		{
 			switch(k.keyCode){
+				case 81:  // Q up
+					ch_7_pwm = 1800;
+					break;
+				case 90:  // Z down
+					ch_7_pwm = 1200;
+					break;
+
+
 				case 118:  // F7 or channel 7
-					if(ch_7_pwm >= 1500){
-						trace("ch_7_pwm LOW")
+					if(k.shiftKey){
 						ch_7_pwm = 1200;
 					}else{
-						trace("ch_7_pwm HIGH")
-						ch_7_pwm = 1900;
+						ch_7_pwm = 1800;
+					}
+					break;
+
+				case 65: 	// a
+				case 117:  	// F6 or channel 6
+					if(ch_6_pwm >= 1500){
+						trace("ch_6_pwm LOW")
+						ch_6_pwm = 1200;
+					}else{
+						trace("ch_6_pwm HIGH")
+						ch_6_pwm = 1900;
 					}
 					break;
 			}
@@ -5860,6 +5684,12 @@
 			}
 
 			switch(k.keyCode){
+				case 81:  // Q up
+				case 90:  // Z down
+					ch_7_pwm = 1500;
+					break;
+
+
 				case 66:  // b
 					copter.jump();
 					break;
@@ -5877,7 +5707,7 @@
 					break;
 
 				case 118:  // F7 or channel 7
-					//ch_7_pwm = 1200;
+					ch_7_pwm = 1500;
 					break;
 
 				case 70: // f for fail
@@ -5890,7 +5720,7 @@
 					break;
 
 				case 72: // h for hover
-					left_sticks.knob_y.y = 0;
+					left_sticks.knob_y.y = 11;
 
 					break;
 
@@ -5899,37 +5729,17 @@
 					break;
 
 				case 65: // q for up NextWP by 100
-					toy_alt_hold = !toy_alt_hold;
-					force_new_altitude(current_loc.alt);
+					//toy_alt_hold = !toy_alt_hold;
+					//force_new_altitude(current_loc.alt);
 					break;
 
-				case 81: // q for up NextWP by 100
-					//next_WP.alt += 100;
-					if(toy_alt == -1)
-						toy_alt = current_loc.alt
-					if(current_loc.alt > 300){
-						toy_alt += 100;
-					}else{
-						toy_alt += 25;
-					}
-					//toy_alt = Math.max(toy_alt, 200);
-					toy_alt = Math.min(toy_alt, 3000);
-					force_new_altitude(toy_alt);
+				//case 81: // q for up NextWP by 100
 					break;
 
-				case 90: // z for downp NextWP by 100
-					if(toy_alt == -1)
-						toy_alt = current_loc.alt
-					if(current_loc.alt > 300){
-						toy_alt -= 100;
-
-					}else{
-						toy_alt -= 25;
-
-					}
+				//case 90: // z for downp NextWP by 100
 
 					//toy_alt = Math.max(toy_alt, 200);
-					force_new_altitude(toy_alt);
+					//force_new_altitude(toy_alt);
 					//next_WP.alt -= 100;
 					//next_WP.alt = Math.max(next_WP.alt, 100);
 					break;
@@ -6309,8 +6119,8 @@
 			trace("----------------------------")
 
 			for (var i:int = 0; i < 1020; i++){
-				apm_rc.set_PWM_channel(ch_6_pwm, CH_6);
-				g.rc_6.set_pwm(apm_rc.InputCh(CH_6));
+				APM_RC.set_PWM_channel(ch_6_pwm, CH_6);
+				g.rc_6.set_pwm(APM_RC.InputCh(CH_6));
 				ch_6_pwm++;
 				trace(g.rc_6.radio_in, g.rc_6.control_in);
 			}
@@ -6328,8 +6138,8 @@
 			trace("----------------------------")
 
 			for (s_out = 0; s_out < 1000; s_out++){
-				//apm_rc.set_PWM_channel(ch_3_pwm, CH_3);
-				//g.rc_3.set_pwm(apm_rc.InputCh(CH_3));
+				//APM_RC.set_PWM_channel(ch_3_pwm, CH_3);
+				//g.rc_3.set_pwm(APM_RC.InputCh(CH_3));
 
 				g.rc_3.servo_out = s_out;
 				g.rc_3.calc_pwm();

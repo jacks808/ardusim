@@ -23,7 +23,7 @@
 	import com.Wind;
 	import com.AHRS;
 	import com.Parameters;
-	import com.APM_RC;
+	import com.AP_RC;
 	import com.AverageFilter;
 
 	public class Copter extends Object
@@ -31,7 +31,7 @@
 		public var ahrs						:AHRS;
 		public var loc						:Location;
 		public var g						:Parameters;
-		public var apm_rc					:APM_RC;
+		public var APM_RC					:AP_RC;
 		public var motor_filter_0			:AverageFilter;
 		public var motor_filter_1			:AverageFilter;
 		public var motor_filter_2			:AverageFilter;
@@ -46,6 +46,7 @@
 		public var rot_accel				:Vector3D;			//
 		public var angle3D					:Vector3D;			//
 		public var windGenerator			:Wind;			//
+		public var edf						:int = 0;			//
 
 		private var screen3d				:Matrix3D;
 
@@ -94,7 +95,6 @@
 
 		public function setThrottleCruise(c:Number):void
 		{
-			c *= .9; // for efficiency issues
 			thrust_scale = (g.mass * gravity) / (4 * c); // 4 motors
 			motor_filter_0	= new AverageFilter(g.esc_delay);
 			motor_filter_1	= new AverageFilter(g.esc_delay);
@@ -124,10 +124,10 @@
 
 			// ESC's moving average filter
 			var motor_output:Array = new Array(4);
-			motor_output[0] = motor_filter_0.apply(apm_rc.get_motor_output(0));
-			motor_output[1] = motor_filter_1.apply(apm_rc.get_motor_output(1));
-			motor_output[2] = motor_filter_2.apply(apm_rc.get_motor_output(2));
-			motor_output[3] = motor_filter_3.apply(apm_rc.get_motor_output(3));
+			motor_output[0] = motor_filter_0.apply(APM_RC.get_motor_output(0));
+			motor_output[1] = motor_filter_1.apply(APM_RC.get_motor_output(1));
+			motor_output[2] = motor_filter_2.apply(APM_RC.get_motor_output(2));
+			motor_output[3] = motor_filter_3.apply(APM_RC.get_motor_output(3));
 
 /*
 		2
@@ -182,7 +182,8 @@
 			_thrust += motor_output[2] * thrust_scale;
 			_thrust += motor_output[3] * thrust_scale;
 
-			var accel_body:Vector3D 	= new Vector3D(0, 0, (_thrust * -.9) / g.mass);
+			var accel_body:Vector3D 	= new Vector3D(edf, 0, (_thrust * -1) / g.mass);
+
 			//var accel_body:Vector3D 	= new Vector3D(0, 0, 0);
 			var accel_earth:Vector3D	= ahrs.dcm.transformVector(accel_body);
 			angle3D						= ahrs.dcm.transformVector(angle3D);

@@ -111,6 +111,8 @@ package com {
 		// -----------------------------------------
 		public var pi_alt_hold				:PID
 		public var pid_throttle				:PID
+		public var toy_alt_large			:int = 100;
+		public var toy_alt_small			:int = 25;
 
 		/*
 		// inertia gains
@@ -222,7 +224,7 @@ package com {
 		public var throttle_fs_action		:int 		= 2;
 		public var throttle_fs_value		:int 		= 975;
 
-		public const THROTTLE_CRUISE		:int		= 551;
+		public const THROTTLE_CRUISE		:int		= 500;
 
 		public var throttle_cruise			:Number;
 		public var throttle_cruise_e		:Number 	= 0;
@@ -247,7 +249,8 @@ package com {
 		//public var ch7_option				:int		= 4; // CH7_RTL 4
 		//public var ch7_option				:int		= 5; // CH7_AUTO_TRIM 5
 		//public var ch7_option				:int		= 6; // CH7_ADC_FILTER 6
-		public var ch7_option				:int		= 7; // CH7_SAVE_WP 7
+		//public var ch7_option				:int		= 7; // CH7_SAVE_WP 7
+		public var ch7_option				:int		= 8; // CH7_TOY
 
 		public var auto_slew_rate			:Number 	= 30;
 
@@ -360,6 +363,8 @@ package com {
 			lead_filter_checkbox.setSelected(true);
 			toy_yaw_rate_BI.setNumber(toy_yaw_rate);
 
+			toy_alt_large_BI.setNumber(toy_alt_large);
+			toy_alt_small_BI.setNumber(toy_alt_small);
 			//auto_slew_rate_BI.setNumber(auto_slew_rate);
 			// stabilize
 			stab_roll_P_BI.setNumber(stabilize_p);
@@ -469,6 +474,9 @@ package com {
 			sim_iterations				= sim_iterations_BI.getNumber();
 			//auto_slew_rate				= auto_slew_rate_BI.getNumber();
 			toy_yaw_rate				= toy_yaw_rate_BI.getNumber();
+			toy_alt_large				= toy_alt_large_BI.getNumber();
+			toy_alt_small				= toy_alt_small_BI.getNumber();
+
 
 			// stabilize
 			pi_stabilize_roll._kp		= stab_roll_P_BI.getNumber();

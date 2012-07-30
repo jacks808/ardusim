@@ -33,6 +33,8 @@ package com {
 		public const RC_CHANNEL_RANGE		:int = 1;
 		public const RC_CHANNEL_ANGLE_RAW	:int = 2;
 
+		public var channel_num				:int = 0;
+
 		public var radio_in					:Number = 0;
 		public var control_in				:Number = 0;
 		public var servo_out				:Number = 0;
@@ -50,11 +52,11 @@ package com {
 		public var _dead_zone				:Number = 0;
 		public var _type					:Number = 0;
 
-		public var _high_in					:Number = 1;
-		public var _low_in					:Number = 0;
+		public var _high_in					:int = 1;
+		public var _low_in					:int = 0;
 
-		public var _high_out				:Number = 1;
-		public var _low_out					:Number = 0;
+		public var _high_out				:int = 1;
+		public var _low_out					:int = 0;
 
 		public function RC_Channel()
 		{
@@ -257,9 +259,9 @@ package com {
 		public function angle_to_pwm():Number
 		{
 			if((servo_out * _reverse) > 0)
-				return _reverse * (servo_out * (radio_max - radio_trim)) / _high_out;
+				return _reverse * (servo_out * (radio_max - radio_trim)) / _high_in;
 			else
-				return _reverse * (servo_out * (radio_trim - radio_min)) / _high_out;
+				return _reverse * (servo_out * (radio_trim - radio_min)) / _high_in;
 		}
 
 		// ------------------------------------------

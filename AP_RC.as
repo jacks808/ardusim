@@ -11,7 +11,7 @@
 
 package com {
 
-	public class APM_RC extends Object
+	public class AP_RC extends Object
 	{
 		// input channels from PPM encoder
 
@@ -20,7 +20,7 @@ package com {
 
 		var state:int = 0;
 
-		public function APM_RC()
+		public function AP_RC()
 		{
 			pwm_channels = new Array(8);
 			output_pwm = new Array(8);
@@ -38,7 +38,7 @@ package com {
 			return  pwm_channels[ch];
 		}
 
-		public function outputCh(ch:int, pwm:int):int
+		public function OutputCh(ch:int, pwm:int):int
 		{
 
 			return  output_pwm[ch] = pwm;
