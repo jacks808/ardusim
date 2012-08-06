@@ -327,6 +327,7 @@
 		public var home								:Location;
 		public var command_cond_queue				:Location;
 		public var command_nav_queue				:Location;
+		public var fast_corner						:Boolean;
 		public var circle_WP						:Location;
 
 		public var home_is_set						:Boolean;
@@ -382,6 +383,9 @@
 		////////////////////////////////////////////////////////////////////////////////
 		public var toy_lookup						:Array;
 		public var toy_alt							:int = -1;
+		public var CH7_toy_flag						:Boolean;
+		public var CH6_toy_flag						:Boolean;
+		public var saved_toy_throttle				:int;
 
 
 		// -----------------------------------------
@@ -519,9 +523,11 @@
 		public var do_flip							:Boolean = false;
 		public var flip_timer						:int = 0;
 		public var flip_state 						:int = 0;
+		public var flip_dir 						:int = 1;
+
 
 		public const AAP_THR_INC					:int = 170;
-		public const AAP_THR_DEC					:int = 90;
+		public const AAP_THR_DEC					:int = 120;
 		public const AAP_ROLL_OUT					:int = 2000;
 
 		// -----------------------------------------
@@ -1045,6 +1051,15 @@
 				//-------------------
 				case 2:
 					medium_loopCounter++;
+
+					if(control_mode == TOY){
+						update_toy_throttle();
+
+						if(throttle_mode == THROTTLE_AUTO){
+							update_toy_altitude();
+						}
+					}
+
 					alt_sensor_flag = true;
 					break;
 
@@ -1111,6 +1126,11 @@
 			if(g.sonar_enabled){
 				sonar_alt = sonar.read();
 			}
+
+			if(g.toy_edf){
+				edf_toy();
+			}
+
 		}
 
 		public function slow_loop():void
@@ -1128,10 +1148,6 @@
 						// save compass offsets
 						superslow_loopCounter = 0;
 					}
-					// XXX SYNC - auto throttle changing
-					//g.rc_3.set_range((g.throttle_cruise - (g.throttle_max - g.throttle_cruise)), g.throttle_max);
-					//g.rc_3.set_range_out(0,1000);
-
 
 					// reduce offset gains
 					if(g.inertia_checkbox.getSelected()){
@@ -1179,6 +1195,10 @@
 
 		public function super_slow_loop():void
 		{
+			// XXX SYNC - auto throttle changing
+			//g.rc_3.set_range((g.throttle_cruise - (g.throttle_max - g.throttle_cruise)), g.throttle_max);
+			//g.rc_3.set_range_out(0,1000);
+
 			// this function disarms the copter if it has been sitting on the ground for any moment of time greater than 25 seconds
 			// but only of the control mode is manual
 			if((control_mode <= ACRO) && (g.rc_3.control_in == 0)){
@@ -1235,15 +1255,19 @@
 						g.rc_4.servo_out = get_acro_yaw(g.rc_4.control_in);
 						yaw_stopped = false;
 						yaw_timer = 150;
+
 					}else if (!yaw_stopped){
 						g.rc_4.servo_out = get_acro_yaw(0);
 						yaw_timer--;
+
 						if(yaw_timer == 0){
 							yaw_stopped = true;
 							nav_yaw = ahrs.yaw_sensor;
 						}
 					}else{
-						if(motors.armed == false)
+						// reset target yaw to current yaw if the motors are disarmed or throttle is zero
+						// Note: we do not want to reset yaw if failsafe has been triggered even though throttle maybe zero (in fact, normally throttle is zero in failsafe)
+						if(motors.armed == false || ((g.rc_3.control_in == 0) && (control_mode <= ACRO) && !failsafe))
 							nav_yaw = ahrs.yaw_sensor;
 
 						g.rc_4.servo_out = get_stabilize_yaw(nav_yaw);
@@ -1270,7 +1294,7 @@
 		{
 			//var control_roll:Number = 0;
 			if (do_flip){
-				if(g.rc_1.control_in == 0){
+				if(Math.abs(g.rc_1.control_in) < 4000){
 					roll_flip();
 					return;
 				}else{
@@ -1350,7 +1374,7 @@
 					break;
 			}
 
-			if(g.rc_3.control_in == 0 && roll_pitch_mode <= ROLL_PITCH_ACRO){
+			if(g.rc_3.control_in == 0 && control_mode <= ACRO){
 				reset_rate_I();
 				reset_stability_I();
 			}
@@ -1457,12 +1481,12 @@
 					// allow interactive changing of atitude
 					if(g.rc_3.control_in < 200){
 						reset_throttle_counter = 50;
-						nav_throttle 		= get_throttle_rate(-80);
+						nav_throttle 		= get_throttle_rate(-120);
 						g.rc_3.servo_out 	= g.throttle_cruise + nav_throttle + angle_boost;
 						break;
 					}else if (g.rc_3.control_in > 800){
 						reset_throttle_counter = 50;
-						nav_throttle 		= get_throttle_rate(80);
+						nav_throttle 		= get_throttle_rate(180);
 						g.rc_3.servo_out 	= g.throttle_cruise + nav_throttle + angle_boost;
 						break;
 					}
@@ -1482,7 +1506,6 @@
 					// calculate angle boost
 					angle_boost = get_angle_boost(g.throttle_cruise);
 
-					// 10hz
 					if(motors.auto_armed == true){
 
 						// how far off are we
@@ -1491,13 +1514,9 @@
 						var desired_speed:Number;
 						if(alt_change_flag == REACHED_ALT){ // we are at or above the target alt
 							desired_speed 		= g.pi_alt_hold.get_p(altitude_error);			// calculate desired speed from lon error
-							i_hold				= g.pi_alt_hold.get_i(altitude_error, m_dt);			// calculate desired speed from lon error
+							update_throttle_cruise(g.pi_alt_hold.get_i(altitude_error, .02));
 							desired_speed		= constrain(desired_speed, -250, 250);
-							if(g.test == false){
-								nav_throttle 		= get_throttle_rate(desired_speed + i_hold);
-							}else{
-								nav_throttle 		= get_throttle_rate(desired_speed) + i_hold;
-							}
+							nav_throttle 		= get_throttle_rate(desired_speed);
 						}else{
 							desired_speed 		= get_desired_climb_rate();
 							nav_throttle 		= get_throttle_rate(desired_speed);
@@ -1730,10 +1749,6 @@
 				baro_rate			= constrain(baro_rate, -300, 300);
 				old_baro_alt		= baro_alt;
 			}
-
-			//current_loc.alt 		= baro_alt;
-			//climb_rate	 			= (current_loc.alt - old_altitude) * 10;
-			//old_altitude 			= current_loc.alt;
 
 			if(g.sonar_enabled){
 				// filter out offset
@@ -2194,14 +2209,15 @@
 			long_error 				= 0;
 			lat_error  				= 0;
 
-			auto_roll 				= 0;
-			auto_pitch 				= 0;
-
-			// Will be set by new command, used by loiter
-			next_WP.alt				= 0;
+			// XXX SYNC
+			//auto_roll 				= 0;
+			//auto_pitch 				= 0;
 
 			// We want to by default pass WPs
 			slow_wp = false;
+
+			// make sure we stick to Nav yaw on takeoff
+			auto_yaw = nav_yaw;
 		}
 
 		/*
@@ -2265,6 +2281,82 @@
 			g.pi_stabilize_pitch.reset_I();
 		}
 
+		//called at 10hz
+		public function update_toy_throttle():void
+		{
+			if (false == CH6_toy_flag && g.rc_6.radio_in >= CH_6_PWM_TRIGGER){
+				CH6_toy_flag = true;
+				throttle_mode 	= THROTTLE_MANUAL;
+
+			}else if (CH6_toy_flag && g.rc_6.radio_in < CH_6_PWM_TRIGGER){
+				CH6_toy_flag = false;
+				throttle_mode = THROTTLE_AUTO;
+				set_new_altitude(current_loc.alt);
+				saved_toy_throttle = g.rc_3.control_in;
+			}
+
+			// look for a change in throttle position to exit throttle hold
+			if(Math.abs(g.rc_3.control_in - saved_toy_throttle) > 40){
+				throttle_mode 	= THROTTLE_MANUAL;
+			}
+		}
+
+		//called at 10hz
+		public function update_toy_altitude():void
+		{
+			// Trigger upward alt change
+			if(false == CH7_toy_flag && g.rc_7.radio_in > 1666){
+				CH7_toy_flag = true;
+				// go up
+				if(next_WP.alt >= 400){
+					force_new_altitude(next_WP.alt + g.toy_alt_large);
+				}else{
+					force_new_altitude(next_WP.alt + g.toy_alt_small);
+				}
+
+			// Trigger downward alt change
+			}else if(false == CH7_toy_flag && g.rc_7.radio_in < 1333){
+				CH7_toy_flag = true;
+				// go down
+				if(next_WP.alt >= (400 + g.toy_alt_large)){
+					force_new_altitude(next_WP.alt - g.toy_alt_large);
+				}else if(next_WP.alt >= g.toy_alt_small){
+					force_new_altitude(next_WP.alt - g.toy_alt_small);
+				}else if(next_WP.alt < g.toy_alt_small){
+					force_new_altitude(0);
+				}
+
+			// clear flag
+			}else if (CH7_toy_flag && ((g.rc_7.radio_in < 1666) && (g.rc_7.radio_in > 1333))){
+				CH7_toy_flag = false;
+			}
+		}
+
+		// called at 50 hz from all flight modes
+		public function edf_toy():void
+		{
+			// EDF control:
+			g.rc_8.radio_out = 1000 + ((Math.abs(g.rc_2.control_in) << 1) / 9);
+			if(g.rc_8.radio_out < 1050)
+				g.rc_8.radio_out = 1000;
+
+			// output throttle to EDF
+			if(motors.armed){
+				APM_RC.OutputCh(CH_8, g.rc_8.radio_out);
+			}else{
+				APM_RC.OutputCh(CH_8, 1000);
+			}
+
+			// output Servo direction
+			if(g.rc_2.control_in > 0){
+				copter.edf = 1000 - g.rc_8.radio_out;
+				APM_RC.OutputCh(CH_6, 1000); // 1000 : 2000
+			}else{
+				copter.edf = g.rc_8.radio_out - 1000;
+				APM_RC.OutputCh(CH_6, 2000); // less than 1450
+			}
+
+		}
 
 		// THOR
 		// The function call for managing the flight mode Toy
@@ -2289,7 +2381,7 @@
 				}
 
 			}else{
-				if(motors.armed == false)
+				if(motors.armed == false || g.rc_3.control_in == 0)
 					nav_yaw = ahrs.yaw_sensor;
 
 				g.rc_4.servo_out = get_stabilize_yaw(nav_yaw);
@@ -2299,10 +2391,8 @@
 			// based on speed and Yaw rate
 			var roll_rate:int;
 
-			roll_rate = -(g.rc_2.control_in * (yaw_rate/100)) / 40;
-			trace("roll", roll_rate, "yaw_rate", yaw_rate, "yaw in", g.rc_1.control_in);
-
-			roll_rate = constrain(roll_rate, -3000, 3000);
+			roll_rate = -(g.rc_2.control_in * (yaw_rate/100)) / 30;
+			roll_rate = constrain(roll_rate, -2000, 2000);
 
 			/*
 					// Lookup value
@@ -2322,30 +2412,16 @@
 					roll_rate = constrain(roll_rate, -(4500 / g.toy_yaw_rate), (4500 / g.toy_yaw_rate));
 			*/
 
-			// Output the attitude
-			g.rc_1.servo_out = get_stabilize_roll(roll_rate);
-			g.rc_2.servo_out = get_stabilize_pitch(0); //  no pitch control
-
-			// EDF control:
-			if(g.rc_2.radio_in >= 1550){
-				g.rc_8.radio_out = 1000 + ((g.rc_2.radio_in - 1550) * 100) / 45;
-			}else if(g.rc_2.radio_in <= 1450){
-				g.rc_8.radio_out = 1000 + ((1450 - g.rc_2.radio_in) * 100) / 45;
+			if(g.toy_edf){
+				// Output the attitude
+				g.rc_1.servo_out = get_stabilize_roll(roll_rate);
+				g.rc_2.servo_out = get_stabilize_pitch(0); //  no pitch control
 			}else{
-				g.rc_8.radio_out = 1000;
+				// Output the attitude
+				g.rc_1.servo_out = get_stabilize_roll(roll_rate);
+				g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in); //  no pitch control
 			}
 
-			APM_RC.OutputCh(CH_8, g.rc_8.radio_out); // 1000 : 2000
-
-			if(g.rc_2.radio_in > 1450){
-				copter.edf = 1000 - g.rc_8.radio_out;
-				APM_RC.OutputCh(CH_6, 1000); // 1000 : 2000
-				}else{
-				copter.edf = g.rc_8.radio_out - 1000;
-				APM_RC.OutputCh(CH_6, 2000); // less than 1450
-			}
-
-			//trace("8 out:", g.rc_8.radio_out);
 		}
 
 
@@ -2372,6 +2448,8 @@
 			prev_nav_index 			= NO_COMMAND;
 			command_cond_queue.id 	= NO_COMMAND;
 			command_nav_queue.id 	= NO_COMMAND;
+
+			fast_corner 			= false;
 
 			// default Yaw tracking
 			yaw_tracking 			= MAV_ROI_WPNEXT;
@@ -2487,7 +2565,7 @@
 
 			// reset speed governer
 			// --------------------
-			waypoint_speed_gov = WAYPOINT_SPEED_MIN;
+			waypoint_speed_gov = g_gps.ground_speed;
 		}
 
 
@@ -3388,36 +3466,53 @@
 				return;
 
 			if(command_nav_queue.id == NO_COMMAND){
+				trace('Our queue is empty');
 				// Our queue is empty
 				// fill command queue with a new command if available, or exit mission
 				// -------------------------------------------------------------------
-				if (command_nav_index < (g.command_total -1)) {
 
-					command_nav_index++;
-					command_nav_queue = get_cmd_with_index(command_nav_index);
+				// find next nav command
+				var tmp_index:int;
 
-					if (command_nav_queue.id <= MAV_CMD_NAV_LAST ){
+				if (command_nav_index < g.command_total) {
+
+					// what is the next index for a nav command?
+					tmp_index = find_next_nav_index(command_nav_index + 1);
+
+					if(tmp_index == -1){
+						exit_mission();
+						return;
+					}else{
+						trace("found next nav command", tmp_index);
+						command_nav_index = tmp_index;
+						command_nav_queue = get_cmd_with_index(command_nav_index);
 						execute_nav_command();
-					} else{
-						// this is a conditional command so we skip it
-						command_nav_queue.id = NO_COMMAND;
 					}
-				}else{
-					trace("OO Commands, land_complete = ", land_complete);
-					// we are out of commands
-					g.command_index  = command_nav_index = 255;
-					// if we are on the ground, enter stabilize, else Land
-					if (land_complete == true){
-						// we will disarm the motors after landing.
-					} else {
-						// If the approach altitude is valid (above 1m), do approach, else land
-						if(g.rtl_approach_alt >= 1){
-							set_mode(LOITER);
-							set_new_altitude(g.rtl_approach_alt);
+
+					// try to load the next nav for better speed control
+					// find_next_nav_index takes the next guess to start the search
+					tmp_index = find_next_nav_index(command_nav_index + 1);
+
+					// Fast corner management
+					// ----------------------
+					if(tmp_index == -1){
+						// there are no more commands left
+					}else{
+						// we have at least one more cmd left
+						var tmp_loc:Location = get_cmd_with_index(tmp_index);
+
+						if(tmp_loc.lat == 0){
+							fast_corner = false;
 						}else{
-							set_mode(LAND);
+							var temp:int = get_bearing(next_WP, tmp_loc) - original_target_bearing;
+							temp = wrap_180(temp);
+							fast_corner = Math.abs(temp) < 6000;
 						}
 					}
+				}else{
+					// we are out of commands
+					exit_mission();
+					return;
 				}
 			}
 
@@ -3479,7 +3574,7 @@
 
 			// Save CMD to Log
 			//if (g.log_bitmask & MASK_LOG_CMD)
-				Log_Write_Cmd(g.command_index, command_nav_queue);
+			Log_Write_Cmd(g.command_index, command_nav_queue);
 
 			// clear navigation prameters
 			reset_nav_params();
@@ -3516,6 +3611,44 @@
 				command_cond_queue.id = NO_COMMAND;
 			}
 		}
+
+		// Finds the next navgation command in EEPROM
+		public function find_next_nav_index(search_index:int):int
+		{
+			var tmp:Location;
+			while(search_index < g.command_total-1){
+				tmp = get_cmd_with_index(search_index);
+				if (tmp.id <= MAV_CMD_NAV_LAST ){
+					return search_index;
+				}else{
+					search_index++;
+				}
+			}
+			return -1;
+		}
+
+
+		public function exit_mission():void
+		{
+			trace("exit_mission");
+			// we are out of commands
+			g.command_index = 255;
+
+			// if we are on the ground, enter stabilize, else Land
+			if (land_complete == true){
+				// we will disarm the motors after landing.
+			} else {
+				// If the approach altitude is valid (above 1m), do approach, else land
+				if(g.rtl_approach_alt == 0){
+					set_mode(LAND);
+				}else{
+					set_mode(LOITER);
+					set_new_altitude(g.rtl_approach_alt);
+				}
+			}
+
+		}
+
 
 		// ---------------------------------------------------------------
 		// control_modes.pde
@@ -3560,46 +3693,11 @@
 		// set this to your trainer switch
 		public function read_trim_switch():void
 		{
-			if(control_mode == TOY){
-				if (g.rc_6.radio_in > CH_6_PWM_TRIGGER){
-					throttle_mode 	= THROTTLE_MANUAL;
-				}else{
-					throttle_mode 	= THROTTLE_AUTO;
-				}
-			}
-
 			do_simple = g.simple_checkbox.getSelected();
 
 			// this is the normal operation set by the mission planner
 			if(g.ch7_option == CH7_SIMPLE_MODE){
 				//do_simple = (g.rc_7.radio_in > CH_7_PWM_TRIGGER);
-
-			}else if(g.ch7_option == CH7_TOY){
-
-				if(trim_flag == false && g.rc_7.radio_in > 1666){
-					trim_flag = true;
-					// go up
-					if(next_WP.alt >= 400){
-						set_new_altitude(next_WP.alt + g.toy_alt_large);
-					}else{
-						set_new_altitude(next_WP.alt + g.toy_alt_small);
-					}
-				}else if(trim_flag == false && g.rc_7.radio_in < 1333){
-					trim_flag = true;
-					// go down
-					if(next_WP.alt >= (400 + g.toy_alt_large)){
-						set_new_altitude(next_WP.alt - g.toy_alt_large);
-					}else if(next_WP.alt >= 100){
-						set_new_altitude(next_WP.alt - g.toy_alt_small);
-					}else if(next_WP.alt < 100){
-						set_new_altitude(0);
-					}
-
-
-				}else if (trim_flag){
-					trim_flag = false;
-				}
-
 
 			}else if (g.ch7_option == CH7_FLIP){
 				if (trim_flag == false && g.rc_7.radio_in > CH_7_PWM_TRIGGER){
@@ -3803,74 +3901,51 @@
 
 		public function init_flip():void
 		{
-			trace("init flip");
 			if(do_flip == false){
 				do_flip = true;
-				flip_timer = 0;
 				flip_state = 0;
+				flip_dir = (ahrs.roll_sensor >= 0) ? 1 :-1;
 			}
 		}
 
-
 		public function roll_flip():void
 		{
-			// Yaw
-			g.rc_4.servo_out = get_stabilize_yaw(nav_yaw);
-
 			// Pitch
-			g.rc_2.servo_out = get_stabilize_pitch(0);
+			g.rc_2.servo_out = get_stabilize_pitch(g.rc_2.control_in);
+
+			var roll:int = ahrs.roll_sensor * flip_dir;
 
 			// Roll State machine
 			switch (flip_state){
-				case 0: // Step 1 : Initialize
-					flip_timer = 0;
-					flip_state++;
-					break;
-				case 1: // Step 2 : Increase throttle to start maneuver
-					if (flip_timer < 90){ 	// .5 seconds
-						g.rc_1.servo_out = get_stabilize_roll(0);
-						g.rc_3.servo_out = g.throttle_cruise + AAP_THR_INC;
-						flip_timer++;
-					}else{
-						flip_state++;
-						flip_timer = 0;
-					}
-					break;
-
-				case 2: // Step 3 : ROLL (until we reach a certain angle [45deg])
-					if (ahrs.roll_sensor < 4500){
+				case 0:
+					if (roll < 4500){
 						// Roll control
-						g.rc_1.servo_out = AAP_ROLL_OUT;
-						g.rc_3.servo_out = g.throttle_cruise;
+						g.rc_1.servo_out = AAP_ROLL_OUT * flip_dir;
+						g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC;
 					}else{
 						flip_state++;
 					}
 					break;
 
-				case 3: // Step 4 : CONTINUE ROLL (until we reach a certain angle [-45deg])
-					if((ahrs.roll_sensor >= 4500) || (ahrs.roll_sensor < -9000)){// we are in second half of roll
-						g.rc_1.servo_out = get_rate_roll(40000);
-						g.rc_3.servo_out = g.throttle_cruise - AAP_THR_DEC;
-					}else{
-						flip_state++;
-					}
-					break;
-
-				case 4: // Step 5 : Increase throttle to stop the descend
-					if (flip_timer < 120){ // .5 seconds
-						g.rc_1.servo_out = get_stabilize_roll(0);
-						g.rc_3.servo_out = g.throttle_cruise + g.throttle_cruise / 2;
-						flip_timer++;
+				case 1:
+					if((roll >= 4500) || (roll < -9000)){
+						g.rc_1.servo_out = get_rate_roll(40000 * flip_dir);
+						g.rc_3.servo_out = g.rc_3.control_in - AAP_THR_DEC;
 					}else{
 						flip_state++;
 						flip_timer = 0;
 					}
 					break;
 
-				case 5: // exit mode
-					flip_timer = 0;
-					flip_state = 0;
-					do_flip = false;
+				case 2:
+					if (flip_timer < 100){
+						g.rc_1.servo_out = get_stabilize_roll(g.rc_1.control_in);
+						g.rc_3.servo_out = g.rc_3.control_in + AAP_THR_INC;
+						flip_timer++;
+					}else{
+						do_flip = false;
+						flip_state = 0;
+					}
 					break;
 			}
 		}
@@ -4192,7 +4267,7 @@
 			var temp:Number;
 			temp = target_bearing - original_target_bearing;
 			temp = wrap_180(temp);
-			return (Math.abs(temp) > 10000);	// we passed the waypoint by 100 degrees
+			return (Math.abs(temp) > 9000);	// we passed the waypoint by 100 degrees
 		}
 
 		public function calc_XY_velocity()
@@ -4428,10 +4503,6 @@
 			var tmp:Number 		= fix * auto_roll;
 
 			auto_roll 			= auto_roll - (fix * auto_roll);
-
-			//trace(z_error, aroll, tmp, 	auto_roll, ahrs.roll_sensor);
-//					300   -3000  -3000   0         -12.73333333333276
-
 		}
 
 		public function get_desired_speed(max_speed:Number, _slow:Boolean):Number
@@ -4445,12 +4516,10 @@
 					   |< we should slow to 1.5 m/s as we hit the target
 			*/
 
-			// max_speed is default 600 or 6m/s
-			if(_slow){
-				max_speed		= Math.min(max_speed, wp_distance / 4);
-				max_speed		= Math.max(max_speed, 0);
+			if(fast_corner){
+				//max_speed 		= max_speed;
 			}else{
-				max_speed		= Math.min(max_speed, wp_distance / 2);
+				max_speed		= Math.min(max_speed, (wp_distance - g.waypoint_radius) / 3);
 				max_speed		= Math.max(max_speed, WAYPOINT_SPEED_MIN);	// go at least 100cm/s
 			}
 
@@ -4460,14 +4529,13 @@
 				waypoint_speed_gov += (100.0 * dTnav); // increase at .5/ms
 				max_speed = waypoint_speed_gov;
 			}
-
 			return max_speed;
 		}
 
 		public function get_desired_climb_rate():Number
 		{
 			if(alt_change_flag == ASCENDING){
-				return constrain(altitude_error / 4, 10, 180); // 180cm /s up
+				return constrain(altitude_error / 4, 100, 180); // 180cm /s up
 
 			}else if(alt_change_flag == DESCENDING){
 				return constrain(altitude_error / 6, -100, -10); // -100cm /s down
@@ -4504,17 +4572,18 @@
 		{
 			next_WP.alt 	= _new_alt;
 			alt_change_flag = REACHED_ALT;
+			//trace("force_new_altitude, ", _new_alt, next_WP.alt);
 		}
 
 		public function set_new_altitude(_new_alt:Number):void
 		{
 			next_WP.alt 	= _new_alt;
 
-			if(next_WP.alt > current_loc.alt + 50){
+			if(next_WP.alt > current_loc.alt + 20){
 				// we are below, going up
 				alt_change_flag = ASCENDING;
 
-			}else if(next_WP.alt < current_loc.alt - 50){
+			}else if(next_WP.alt < current_loc.alt - 20){
 				// we are above, going down
 				alt_change_flag = DESCENDING;
 			}else{
@@ -4528,12 +4597,12 @@
 
 			if(alt_change_flag == ASCENDING){
 				// we are below, going up
-				if(current_loc.alt >  next_WP.alt){
+				if(current_loc.alt >  next_WP.alt - 50){
 					alt_change_flag = REACHED_ALT;
 				}
 			}else if (alt_change_flag == DESCENDING){
 				// we are above, going down
-				if(current_loc.alt <=  next_WP.alt)
+				if(current_loc.alt <=  next_WP.alt + 50)
 					alt_change_flag = REACHED_ALT;
 				}
 			}
@@ -4741,11 +4810,10 @@
 			motors.auto_armed = (g.rc_3.control_in > 0);
 
 			// clearing value used in interactive alt hold
-			//manual_boost = 0;
+			reset_throttle_counter = 0;
 
 			// clearing value used to force the copter down in landing mode
 			landing_boost = 0;
-			reset_throttle_counter = 0;
 
 			// do we want to come to a stop or pass a WP?
 			slow_wp = false;
@@ -4783,8 +4851,7 @@
 					roll_pitch_mode = ROLL_PITCH_STABLE;
 					throttle_mode 	= THROTTLE_HOLD;
 
-					//force_new_altitude(Math.max(current_loc.alt, 100));
-					force_new_altitude(Math.max(300, 100));
+					force_new_altitude(Math.max(current_loc.alt, 100));
 					break;
 
 				case AUTO:
@@ -4859,8 +4926,11 @@
 				case TOY:
 					yaw_mode 		= YAW_TOY;
 					roll_pitch_mode = ROLL_PITCH_TOY;
-					throttle_mode 	= THROTTLE_MANUAL;
 					wp_control 		= NO_NAV_MODE;
+					// set the throttle mode by reading the ch6 switch
+					read_trim_switch();
+					// hold the current altitude
+					set_new_altitude(current_loc.alt);
 					break;
 
 				default:
@@ -4874,9 +4944,6 @@
 				// Receiver will be outputting low throttle
 				motors.auto_armed = true;
 			}
-
-			// called to calculate gain for alt hold
-			update_throttle_cruise();
 
 			if(roll_pitch_mode <= ROLL_PITCH_ACRO){
 				// We are under manual attitude control
@@ -4917,9 +4984,8 @@
 			initial_simple_bearing = ahrs.yaw_sensor;
 		}
 
-		public function update_throttle_cruise():void
+		public function update_throttle_cruise(tmp:int):void
 		{
-			var tmp:Number = g.pi_alt_hold.get_integrator();
 			if(tmp != 0){
 				g.throttle_cruise += tmp;
 				reset_throttle_I();
@@ -5287,19 +5353,14 @@
 			public const MAV_ROI_ENUM_END				:int = 5;
 			*/
 
-			// Marco's issue:
-			wp_manager.clearWaypoints();
-			wp_manager.lat_offset =  448070247;
-			wp_manager.lng_offset =  116106438;
-			wp_manager.addWaypoint(16, 1, 0, 2000, 448071360, 116112808);
-
-			/*
 			wp_manager.clearWaypoints();
 			wp_manager.lat_offset =  397151280;
 			wp_manager.lng_offset = -1052041650;
 			wp_manager.addWaypoint(22, 1, 0, 1000, 0, 0);
 									//  o  p1  alt	lat			lon
-			wp_manager.addWaypoint(16, 1, 0, 1000, 397154624, -1052041600);
+			wp_manager.addWaypoint(16, 1, 0, 1000, 397152600, -1052041650);
+			wp_manager.addWaypoint(16, 1, 0, 1000, 397154624, -1052041650);
+
 			wp_manager.addWaypoint(16, 1, 0, 2000, 397155104, -1052037184);
 			wp_manager.addWaypoint(16, 1, 0, 3000, 397145312, -1052032704);
 			wp_manager.addWaypoint(16, 1, 0, 4000, 397143200, -1052018496);
@@ -5321,7 +5382,6 @@
 			wp_manager.addWaypoint(16, 1, 0, 500, 397154496, -1052042752);
 			wp_manager.addWaypoint(16, 1, 0, 800, 397154592, -1052042112);
 			wp_manager.addWaypoint(21, 1, 0, 0, 0, 0);
-			*/
 
 		}
 

@@ -56,6 +56,8 @@ package com {
 		public var mass						:Number 	= 500;
 		public var esc_delay				:int 		= 12;
 		public var test						:Boolean = false;
+		public var toy_edf					:Boolean = true;
+
 
 		// -----------------------------------------
 		// Sensors
