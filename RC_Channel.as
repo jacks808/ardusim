@@ -37,6 +37,10 @@ package com {
 
 		public var radio_in					:Number = 0;
 		public var control_in				:Number = 0;
+		public var expo_in					:Number = 0;
+		public var expo_LUT					:Array;
+		public var expo_enabled				:Boolean = false;
+
 		public var servo_out				:Number = 0;
 		public var pwm_out					:Number = 0;
 		public var radio_out				:Number = 0;
@@ -52,8 +56,8 @@ package com {
 		public var _dead_zone				:Number = 0;
 		public var _type					:Number = 0;
 
-		public var _high_in					:int = 1;
-		public var _low_in					:int = 0;
+		public var _high					:int = 1;
+		public var _low						:int = 0;
 
 		public var _high_out				:int = 1;
 		public var _low_out					:int = 0;
@@ -65,8 +69,8 @@ package com {
 		public function set_range(low:int, high:int):void
 		{
 			_type 		= RC_CHANNEL_RANGE;
-			_high_in 	= high;
-			_low_in 	= low;
+			_high 		= high;
+			_low 		= low;
 			_high_out 	= high;
 			_low_out 	= low;
 		}
@@ -82,7 +86,7 @@ package com {
 		public function set_angle(angle:int):void
 		{
 			_type 		= RC_CHANNEL_ANGLE;
-			_high_in 	= angle;
+			_high 		= angle;
 		}
 
 		public function set_dead_zone(dzone:int):void
@@ -124,27 +128,32 @@ package com {
 			radio_trim = radio_in;
 		}
 
+		public function set_expo_LUT(lut:Array)
+		{
+			expo_LUT = lut;
+			trace("did set lut")
+		}
+
 		// read input from APM_RC - create a control_in value
 		public function set_pwm(pwm:Number):void
 		{
-			if(_filter){
-				if(radio_in == 0)
-					radio_in = pwm;
-				else
-					radio_in = (pwm + radio_in) >> 1;		// Small filtering
-			}else{
-				radio_in = constrain(pwm, radio_min, radio_max);
-			}
+			radio_in = pwm;
 
 			if(_type == RC_CHANNEL_RANGE){
-				//Serial.print("range ");
 				control_in = pwm_to_range();
-				//control_in = constrain(control_in, _low_in, _high_in);
-				control_in = Math.min(control_in, _high_in);
+				//control_in = constrain(control_in, _low, _high);
+				//control_in = Math.min(control_in, _high);
 				control_in = (control_in < _dead_zone) ? 0 : control_in;
 
 				if (Math.abs(scale_output) != 1){
 					control_in *= scale_output;
+				}
+
+				if(expo_enabled){
+					var tmp1, tmp2:int;
+			   		tmp1 	= constrain(control_in, 0, 999);
+			   		tmp2	= tmp1 / 100;   // 0:9
+					control_in	= expo_LUT[tmp2] + (tmp1 - tmp2 * 100) * (expo_LUT[tmp2 + 1] - expo_LUT[tmp2]) / 100;
 				}
 
 			}else{
@@ -160,7 +169,7 @@ package com {
 				// coming soon ??
 				if(expo) {
 					long temp = control_in;
-					temp = (temp * temp) / _high_in;
+					temp = (temp * temp) / _high;
 					control_in = (int)((control_in >= 0) ? temp : -temp);
 				}*/
 			}
@@ -168,7 +177,7 @@ package com {
 
 		public function control_mix(value:Number):Number
 		{
-			return (1 - Math.abs(control_in / _high_in)) * value + control_in;
+			return (1 - Math.abs(control_in / _high)) * value + control_in;
 		}
 
 		// are we below a threshold?
@@ -247,9 +256,9 @@ package com {
 				return 0;
 
 			if(radio_in > radio_trim_high){
-				return _reverse * (_high_in * (radio_in - radio_trim_high)) / (radio_max  - radio_trim_high);
+				return _reverse * (_high * (radio_in - radio_trim_high)) / (radio_max  - radio_trim_high);
 			}else if(radio_in < radio_trim_low){
-				return _reverse * (_high_in * (radio_in - radio_trim_low)) / (radio_trim_low - radio_min);
+				return _reverse * (_high * (radio_in - radio_trim_low)) / (radio_trim_low - radio_min);
 			}else
 				return 0;
 		}
@@ -259,9 +268,9 @@ package com {
 		public function angle_to_pwm():Number
 		{
 			if((servo_out * _reverse) > 0)
-				return _reverse * (servo_out * (radio_max - radio_trim)) / _high_in;
+				return _reverse * (servo_out * (radio_max - radio_trim)) / _high;
 			else
-				return _reverse * (servo_out * (radio_trim - radio_min)) / _high_in;
+				return _reverse * (servo_out * (radio_trim - radio_min)) / _high;
 		}
 
 		// ------------------------------------------
@@ -269,10 +278,12 @@ package com {
 
 		public function pwm_to_range():Number
 		{
+			var r_in:int = constrain(radio_in, radio_min, radio_max);
+
 			var radio_trim_low:int = radio_min + _dead_zone;
 
-			if(radio_in > radio_trim_low)
-				return (_low_in + ((_high_in - _low_in) * (radio_in - radio_trim_low)) / (radio_max - radio_trim_low));
+			if(r_in > radio_trim_low)
+				return (_low + ((_high - _low) * (r_in - radio_trim_low)) / (radio_max - radio_trim_low));
 			else if(_dead_zone > 0)
 				return 0;
 			else

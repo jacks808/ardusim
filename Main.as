@@ -106,6 +106,20 @@
 		public var x_target_speed					:Number = 0;
 		public var y_target_speed					:Number = 0;
 
+		// EXPO
+		public var throttle_expo_LUT				:Array;
+		public var rp_expo_acro_LUT					:Array;
+		public var rp_expo_stab_LUT					:Array;
+
+		public var throttle_scale					:int = 26;
+		public var throttle_expo					:int = 30;
+
+		public var acro_scale						:int = 32;
+		public var acro_expo						:int = 30;
+
+		public var stab_scale						:int = 32;
+		public var stab_expo						:int = 30;
+
 
 		////////////////////////////////////////////////////////////////////////////////
 		// Radio
@@ -150,7 +164,8 @@
 		public const POSITION						:int = 8;
 		public const LAND							:int = 9;
 		public const OF_LOITER						:int = 10;
-		public const TOY							:int = 11;	// THOR Enum for Toy mode
+		public const TOY_A							:int = 11;	// THOR Enum for Toy mode
+		public const TOY_M							:int = 12;	// THOR Enum for Toy mode
 
 
 		public const LOITER_MODE					:int = 1;
@@ -198,6 +213,9 @@
 
 		public const RADX100						:Number = 0.000174532925;
 		public const DEGX100						:Number = 5729.57795;
+
+		public const t6								:Number = 1000000;
+		public const t7								:Number = 10000000;
 		public const FS_COUNTER						:int = 3;
 
 		// AP Command enumeration
@@ -272,9 +290,12 @@
 		public const CH7_AUTO_TRIM 					:int = 5;
 		public const CH7_ADC_FILTER 				:int = 6;
 		public const CH7_SAVE_WP 					:int = 7;
-		public const CH7_TOY 						:int = 8;
+		public const CH7_MULTI_MODE 				:int = 8;
 		public const CH_7_PWM_TRIGGER 	 			:int = 1800
+
+		public const CH_6_PWM_TRIGGER_HIGH 	 		:int = 1800
 		public const CH_6_PWM_TRIGGER 	 			:int = 1500
+		public const CH_6_PWM_TRIGGER_LOW 	 		:int = 1200
 
 		// --------------------------------------
 		// Timers
@@ -324,6 +345,7 @@
 		public var target_WP						:Location;
 		public var guided_WP						:Location;
 		public var current_loc						:Location;
+		public var filtered_loc						:Location;
 		public var home								:Location;
 		public var command_cond_queue				:Location;
 		public var command_nav_queue				:Location;
@@ -384,7 +406,7 @@
 		public var toy_lookup						:Array;
 		public var toy_alt							:int = -1;
 		public var CH7_toy_flag						:Boolean;
-		public var CH6_toy_flag						:Boolean;
+		//public var CH6_toy_flag						:Boolean;
 		public var saved_toy_throttle				:int;
 
 
@@ -595,6 +617,7 @@
 
 			next_WP					= new Location();
 			current_loc				= new Location();
+			filtered_loc			= new Location();
 			home					= new Location();
 			guided_WP				= new Location();
 			target_WP				= new Location();
@@ -646,10 +669,9 @@
 			ground.controller 	= this;
 			ground.current_loc 	= this.current_loc;
 
-
 			//THOR Added for additional Fligt mode
-			flight_mode_strings = new Array("STABILIZE","ACRO","ALT_HOLD","AUTO","GUIDED","LOITER","RTL","CIRCLE","POSITION","LAND","OF_LOITER","TOY");
-			flight_modes = new Array(0,1,2,3,4,5,6,7,8,9,10,11,12);
+			flight_mode_strings = new Array("STABILIZE","ACRO","ALT_HOLD","AUTO","GUIDED","LOITER","RTL","CIRCLE","POSITION","LAND","OF_LOITER","TOY_A","TOY_M");
+			flight_modes 		= new Array(0,1,2,3,4,5,6,7,8,9,10,11,12,13);
 
 			colors = new Array(0xD6C274, 0xDB9E46, 0x95706B, 0x9D2423, 0x7B962E, 0xB5BC87, 0x7EBC5F, 0x74287D, 0x765A70, 0xA82DBC, 0xD9B64E, 0xF28B50, 0xF25E3D, 0x79735E, 0x6D78F4);
 			populateMenus(plotMenu);
@@ -666,7 +688,8 @@
 			modeMenu.addItem(new QuickMenuItem("8  POSITION",	"8"));
 			modeMenu.addItem(new QuickMenuItem("9  LAND",		"9"));
 			modeMenu.addItem(new QuickMenuItem("10 OF_LOITER",	"10"));
-			modeMenu.addItem(new QuickMenuItem("11 TOY",		"11"));
+			modeMenu.addItem(new QuickMenuItem("11 TOY_AltHold","11"));
+			modeMenu.addItem(new QuickMenuItem("12 TOY_Manual",	"12"));
 
 			addEventListener(Event.ADDED_TO_STAGE, addedToStage);
 	    }
@@ -1052,7 +1075,7 @@
 				case 2:
 					medium_loopCounter++;
 
-					if(control_mode == TOY){
+					if(control_mode == TOY_A){
 						update_toy_throttle();
 
 						if(throttle_mode == THROTTLE_AUTO){
@@ -1437,7 +1460,12 @@
 		{
 			var throttle_out:Number = 0;
 
-			//recalc throttle range
+			// calculate angle boost
+			if(throttle_mode ==  THROTTLE_MANUAL){
+				angle_boost = get_angle_boost(g.rc_3.control_in);
+			}else{
+				angle_boost = get_angle_boost(g.throttle_cruise);
+			}
 
 			switch(throttle_mode){
 				case THROTTLE_MANUAL:
@@ -1445,7 +1473,6 @@
 						if (control_mode == ACRO){
 							g.rc_3.servo_out 	= g.rc_3.control_in;
 						}else{
-							angle_boost 		= get_angle_boost(g.rc_3.control_in);
 							g.rc_3.servo_out 	= g.rc_3.control_in + angle_boost;
 						}
 
@@ -1485,27 +1512,28 @@
 						g.rc_3.servo_out 	= g.throttle_cruise + nav_throttle + angle_boost;
 						break;
 					}else if (g.rc_3.control_in > 800){
-						reset_throttle_counter = 50;
+						reset_throttle_counter = 250;
 						nav_throttle 		= get_throttle_rate(180);
 						g.rc_3.servo_out 	= g.throttle_cruise + nav_throttle + angle_boost;
 						break;
 					}
 
+					// allow 1 second of slow down after pilot moves throttle back into deadzone
 					if(reset_throttle_counter > 0){
 						reset_throttle_counter--;
+						// if 1 second has passed set the target altitude to the current altitude
 						if(reset_throttle_counter == 0){
 							force_new_altitude(Math.max(current_loc.alt, 100));
 						}else{
 							nav_throttle 		= get_throttle_rate(0);
+							g.rc_3.servo_out 	= g.throttle_cruise + nav_throttle + angle_boost;
+							break;
 						}
 					}
 
 					// else fall through
 
 				case THROTTLE_AUTO:
-					// calculate angle boost
-					angle_boost = get_angle_boost(g.throttle_cruise);
-
 					if(motors.auto_armed == true){
 
 						// how far off are we
@@ -1661,12 +1689,9 @@
 					break;
 
 				case STABILIZE:
+				case TOY_A:
+				case TOY_M:
 					wp_control = NO_NAV_MODE;
-					update_nav_wp();
-					break;
-
-				// THOR added to enable Virtual WP nav
-				case TOY:
 					update_nav_wp();
 					break;
 			}
@@ -2284,6 +2309,7 @@
 		//called at 10hz
 		public function update_toy_throttle():void
 		{
+			/*
 			if (false == CH6_toy_flag && g.rc_6.radio_in >= CH_6_PWM_TRIGGER){
 				CH6_toy_flag = true;
 				throttle_mode 	= THROTTLE_MANUAL;
@@ -2293,7 +2319,7 @@
 				throttle_mode = THROTTLE_AUTO;
 				set_new_altitude(current_loc.alt);
 				saved_toy_throttle = g.rc_3.control_in;
-			}
+			}*/
 
 			// look for a change in throttle position to exit throttle hold
 			if(Math.abs(g.rc_3.control_in - saved_toy_throttle) > 40){
@@ -2415,7 +2441,7 @@
 			if(g.toy_edf){
 				// Output the attitude
 				g.rc_1.servo_out = get_stabilize_roll(roll_rate);
-				g.rc_2.servo_out = get_stabilize_pitch(0); //  no pitch control
+				g.rc_2.servo_out = get_stabilize_pitch(g.rc_6.control_in); // use CH6 to trim pitch
 			}else{
 				// Output the attitude
 				g.rc_1.servo_out = get_stabilize_roll(roll_rate);
@@ -2551,9 +2577,14 @@
 			// Save new altitude so we can track it for climb_rate
 			set_new_altitude(next_WP.alt);
 
+			// this is used to offset the shrinking longitude as we go towards the poles
+			var rads:Number 	= (next_WP.lat/t7) * 0.0174532925;
+			scaleLongDown 		= Math.cos(rads);
+			scaleLongUp 		= 1.0/Math.cos(rads);
+
 			// this is handy for the ground station
 			// -----------------------------------
-			wp_distance 		= get_distance(current_loc, next_WP);
+			wp_distance 		= get_distance(filtered_loc, next_WP);
 			target_bearing 		= get_bearing(prev_WP, next_WP);
 
 			// calc the location error:
@@ -3462,11 +3493,11 @@
 			//uint8_t tmp = g.command_index.get();
 			//Serial.printf("command_index %u \n", tmp);
 
-			if (g.command_total <= 1 || g.command_index >= 127)
+			if(g.command_total <= 1 || g.command_index >= 255)
 				return;
 
 			if(command_nav_queue.id == NO_COMMAND){
-				trace('Our queue is empty');
+				trace('Our queue is empty' ,command_nav_index);
 				// Our queue is empty
 				// fill command queue with a new command if available, or exit mission
 				// -------------------------------------------------------------------
@@ -3474,7 +3505,7 @@
 				// find next nav command
 				var tmp_index:int;
 
-				if (command_nav_index < g.command_total) {
+				if(command_nav_index < g.command_total){
 
 					// what is the next index for a nav command?
 					tmp_index = find_next_nav_index(command_nav_index + 1);
@@ -3527,7 +3558,6 @@
 
 				if (command_cond_index >= command_nav_index){
 					// don't process the fututre
-					//command_cond_index = NO_COMMAND;
 					return;
 
 				}else if (command_cond_index == NO_COMMAND){
@@ -3593,10 +3623,10 @@
 			if(verify_must()){
 				//Serial.printf("verified must cmd %d\n" , command_nav_index);
 				trace("verified must cmd", command_nav_index);
-				command_nav_queue.id = NO_COMMAND;
+				command_nav_queue.id 	= NO_COMMAND;
 
 				// store our most recent executed nav command
-				prev_nav_index = command_nav_index;
+				prev_nav_index 			= command_nav_index;
 
 				// Wipe existing conditionals
 				command_cond_index 		= NO_COMMAND;
@@ -3618,7 +3648,7 @@
 			var tmp:Location;
 			while(search_index < g.command_total-1){
 				tmp = get_cmd_with_index(search_index);
-				if (tmp.id <= MAV_CMD_NAV_LAST ){
+				if (tmp.id <= MAV_CMD_NAV_LAST){
 					return search_index;
 				}else{
 					search_index++;
@@ -3694,12 +3724,29 @@
 		public function read_trim_switch():void
 		{
 			do_simple = g.simple_checkbox.getSelected();
+			var option:int;
+
+			if(g.ch7_option == CH7_MULTI_MODE){
+				if (g.rc_6.radio_in < CH_6_PWM_TRIGGER_LOW){
+					option = CH7_FLIP;
+				}else if (g.rc_6.radio_in > CH_6_PWM_TRIGGER_HIGH){
+					option = CH7_SAVE_WP;
+				}else{
+					option = CH7_RTL;
+				}
+			}else{
+				option = g.ch7_option;
+			}
+
+
+
+
 
 			// this is the normal operation set by the mission planner
-			if(g.ch7_option == CH7_SIMPLE_MODE){
+			if(option == CH7_SIMPLE_MODE){
 				//do_simple = (g.rc_7.radio_in > CH_7_PWM_TRIGGER);
 
-			}else if (g.ch7_option == CH7_FLIP){
+			}else if (option == CH7_FLIP){
 				if (trim_flag == false && g.rc_7.radio_in > CH_7_PWM_TRIGGER){
 					trim_flag = true;
 
@@ -3711,7 +3758,7 @@
 					trim_flag = false;
 				}
 
-			}else if (g.ch7_option == CH7_RTL){
+			}else if (option == CH7_RTL){
 				if (trim_flag == false && g.rc_7.radio_in > CH_7_PWM_TRIGGER){
 					trim_flag = true;
 					set_mode(RTL);
@@ -3724,7 +3771,7 @@
 					//}
 				}
 
-			}else if (g.ch7_option == CH7_SAVE_WP){
+			}else if (option == CH7_SAVE_WP){
 
 				if (g.rc_7.radio_in > CH_7_PWM_TRIGGER){ // switch is engaged
 					trim_flag = true;
@@ -3784,7 +3831,7 @@
 						// 3 = command total
 					}
 				}
-			}else if (g.ch7_option == CH7_AUTO_TRIM){
+			}else if (option == CH7_AUTO_TRIM){
 				//if (g.rc_7.radio_in > CH_7_PWM_TRIGGER){
 					//auto_level_counter = 10;
 				//}
@@ -4253,8 +4300,8 @@
 		{
 			// waypoint distance from plane in cm
 			// ---------------------------------------
-			wp_distance 	= get_distance(current_loc, next_WP);
-			home_distance 	= get_distance(current_loc, home);
+			wp_distance 	= get_distance(filtered_loc, next_WP);
+			home_distance 	= get_distance(filtered_loc, home);
 
 			// target_bearing is where we should be heading
 			// --------------------------------------------
@@ -4303,17 +4350,15 @@
 				xy_error_correction();
 			}
 
-			if(g.lead_filter_checkbox.getSelected()){
-				if(g.inertia_checkbox.getSelected()){
-					current_loc.lng = xLeadFilter.get_position(g_gps.longitude, accels_velocity.x);
-					current_loc.lat = yLeadFilter.get_position(g_gps.latitude,  accels_velocity.y);
-				}else{
-					current_loc.lng = xLeadFilter.get_position(g_gps.longitude, x_actual_speed);
-					current_loc.lat = yLeadFilter.get_position(g_gps.latitude,  y_actual_speed);
-				}
+			current_loc.lng = g_gps.longitude;
+			current_loc.lat = g_gps.latitude;
+
+			if(g.inertia_checkbox.getSelected()){
+				filtered_loc.lng = xLeadFilter.get_position(g_gps.longitude, accels_velocity.x);
+				filtered_loc.lat = yLeadFilter.get_position(g_gps.latitude,  accels_velocity.y);
 			}else{
-				current_loc.lng = g_gps.longitude;
-				current_loc.lat = g_gps.latitude;
+				filtered_loc.lng = xLeadFilter.get_position(g_gps.longitude, x_actual_speed);
+				filtered_loc.lat = yLeadFilter.get_position(g_gps.latitude,  y_actual_speed);
 			}
 
 
@@ -4568,16 +4613,16 @@
 			alt_change_flag = REACHED_ALT;
 		}
 
-		public function force_new_altitude(_new_alt:Number):void
+		public function force_new_altitude(new_alt:Number):void
 		{
-			next_WP.alt 	= _new_alt;
+			next_WP.alt 	= new_alt;
 			alt_change_flag = REACHED_ALT;
 			//trace("force_new_altitude, ", _new_alt, next_WP.alt);
 		}
 
-		public function set_new_altitude(_new_alt:Number):void
+		public function set_new_altitude(new_alt:Number):void
 		{
-			next_WP.alt 	= _new_alt;
+			next_WP.alt 	= new_alt;
 
 			if(next_WP.alt > current_loc.alt + 20){
 				// we are below, going up
@@ -4671,6 +4716,16 @@
 			g.rc_1.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
 			g.rc_2.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
 			g.rc_4.set_type(g.rc_1.RC_CHANNEL_ANGLE_RAW);
+
+			// setup throttle expo:
+			throttle_expo_LUT = new Array(11);
+
+			for(var i:int = 0; i < throttle_expo_LUT.length; i++){
+				throttle_expo_LUT[i] = (2500 + throttle_expo * (i * i - 25)) * i * throttle_scale / 1250;
+				trace("throttle_expo: ", i, throttle_expo_LUT[i]);
+			}
+			g.rc_3.set_expo_LUT(throttle_expo_LUT);
+			g.rc_3.expo_enabled = true;
 		}
 
 		public function init_rc_out():void
@@ -4697,6 +4752,17 @@
 				if(tmp > g.throttle_fs_value)
 					g.rc_3.set_pwm(tmp);
 
+				/*
+				var tmp1, tmp2:int;
+				tmp1 	= g.rc_3.control_in;
+		   		tmp1 	= constrain(tmp1, 0, 999);
+		   		tmp2	= tmp1 / 100;   // 0:9
+				*/
+
+
+				//g.rc_3.control_in 	= throttle_expo_LUT[tmp2] + (tmp1 - tmp2 * 100) * (throttle_expo_LUT[tmp2 + 1] - throttle_expo_LUT[tmp2]) / 100;
+
+				//trace(tmp1, tmp2, throttle_expo_LUT[tmp2], (tmp1 - tmp2 * 100), (throttle_expo_LUT[tmp2 + 1] - throttle_expo_LUT[tmp2]) )
 				//trace("3 in", tmp, g.rc_3.radio_in, g.rc_3.control_in, g.rc_3.servo_out);
 
 				//g.rc_3.control_in = Math.min(g.rc_3.control_in, g.throttle_max);
@@ -4792,7 +4858,7 @@
 				trace("set_mode, oh noes!", mode);
 				// THOR
 				// We don't care about Home if we don't have lock yet in Toy mode
-				if(mode == TOY || mode == OF_LOITER){
+				if(mode == TOY_A || mode == TOY_M || mode == OF_LOITER){
 					// nothing
 				}else if (mode > ALT_HOLD){
 					mode = STABILIZE;
@@ -4923,14 +4989,24 @@
 				// THOR
 				// These are the flight modes for Toy mode
 				// See the defines for the enumerated values
-				case TOY:
+				case TOY_A:
+					yaw_mode 		= YAW_TOY;
+					roll_pitch_mode = ROLL_PITCH_TOY;
+					throttle_mode 	= THROTTLE_AUTO;
+					wp_control 		= NO_NAV_MODE;
+
+					// save throttle for fast exit of Alt hold
+					saved_toy_throttle = g.rc_3.control_in;
+
+					// hold the current altitude
+					set_new_altitude(current_loc.alt);
+					break;
+
+				case TOY_M:
 					yaw_mode 		= YAW_TOY;
 					roll_pitch_mode = ROLL_PITCH_TOY;
 					wp_control 		= NO_NAV_MODE;
-					// set the throttle mode by reading the ch6 switch
-					read_trim_switch();
-					// hold the current altitude
-					set_new_altitude(current_loc.alt);
+					throttle_mode 	= THROTTLE_MANUAL;
 					break;
 
 				default:
@@ -5259,6 +5335,7 @@
 
 			/*
 			// The Baseball fields at GGPark
+			wp_manager.clearWaypoints();
 			wp_manager.lat_offset = 377679650;
 			wp_manager.lng_offset = -1224646780;
 			wp_manager.addWaypoint(22, 1, 0, 600, 377679648, -1224646784);
@@ -5272,7 +5349,18 @@
 			wp_manager.addWaypoint(16, 1, 0, 1200, 377672896, -1224649472);
 			wp_manager.addWaypoint(16, 1, 0, 500, 377679168, -1224646656);
 			wp_manager.addWaypoint(MAV_CMD_NAV_LAND, 1, 0, 0, 0, 0);
-			*/
+			//*/
+
+			wp_manager.clearWaypoints();
+			wp_manager.lat_offset = 389552880;
+			wp_manager.lng_offset = -1199525700;
+			wp_manager.addWaypoint(22, 1, 0, 2500, 389552800, -1199526400);
+			wp_manager.addWaypoint(16, 1, 0, 2500, 389542016, -1199537408);
+			wp_manager.addWaypoint(16, 1, 0, 2500, 389552448, -1199525248);
+			wp_manager.addWaypoint(16, 1, 0, 2500, 389562840, -1199518100);
+			wp_manager.addWaypoint(16, 1, 0, 2500, 389553530, -1199526300);
+			wp_manager.addWaypoint(21, 1, 0, 0, 0, 0);
+
 
 			/*
 			// A Basic 40m square for testing
@@ -5352,7 +5440,7 @@
 			public const MAV_ROI_TARGET					:int = 4;
 			public const MAV_ROI_ENUM_END				:int = 5;
 			*/
-
+			/*
 			wp_manager.clearWaypoints();
 			wp_manager.lat_offset =  397151280;
 			wp_manager.lng_offset = -1052041650;
@@ -5382,7 +5470,7 @@
 			wp_manager.addWaypoint(16, 1, 0, 500, 397154496, -1052042752);
 			wp_manager.addWaypoint(16, 1, 0, 800, 397154592, -1052042112);
 			wp_manager.addWaypoint(21, 1, 0, 0, 0, 0);
-
+			*/
 		}
 
 		private function init_sim():void
@@ -6175,7 +6263,7 @@
 			g.rc_6.set_dead_zone(60);
 			g.rc_6.set_range(1000,2000);
 			trace("----------------------------")
-			trace(g.rc_6._high_in, g.rc_6._high_in);
+			trace(g.rc_6._high, g.rc_6._high);
 			trace("----------------------------")
 
 			for (var i:int = 0; i < 1020; i++){
@@ -6208,6 +6296,22 @@
 		}
 
 		public function report_wp(index:int = 255)
+		{
+			current_loc.lat = 389539260;
+			current_loc.lng = -1199540200;
+
+			next_WP.lat = 389538528;
+			next_WP.lng = -1199541248;
+
+			set_next_WP(next_WP);
+			filtered_loc = next_WP.clone();
+
+			navigate();
+
+			trace("dist:", wp_distance, "bear:", target_bearing, "scale lon:", scaleLongDown);
+		}
+
+		public function report_wp2(index:int = 255)
 		{
 			var temp:Location;
 			if(index == 255){
