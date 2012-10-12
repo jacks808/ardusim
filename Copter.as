@@ -95,6 +95,7 @@
 
 		public function setThrottleCruise(c:Number):void
 		{
+			//c *= .9; // for efficiency issues
 			thrust_scale = (g.mass * gravity) / (4 * c); // 4 motors
 			motor_filter_0	= new AverageFilter(g.esc_delay);
 			motor_filter_1	= new AverageFilter(g.esc_delay);
@@ -183,8 +184,9 @@
 			_thrust += motor_output[2] * thrust_scale;
 			_thrust += motor_output[3] * thrust_scale;
 
-			var accel_body:Vector3D 	= new Vector3D(edf, 0, (_thrust * -1) / g.mass);
-			//var accel_body:Vector3D 	= new Vector3D(0, 0, (_thrust * -.9) / g.mass);
+			//var accel_body:Vector3D 	= new Vector3D(edf, 0, (_thrust * -1) / g.mass);
+			var accel_body:Vector3D 	= new Vector3D(0, 0, (_thrust * -1) / g.mass);
+			//trace(edf)
 
 			//var accel_body:Vector3D 	= new Vector3D(0, 0, 0);
 			var accel_earth:Vector3D	= ahrs.dcm.transformVector(accel_body);
