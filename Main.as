@@ -4724,8 +4724,9 @@
 				throttle_expo_LUT[i] = (2500 + throttle_expo * (i * i - 25)) * i * throttle_scale / 1250;
 				trace("throttle_expo: ", i, throttle_expo_LUT[i]);
 			}
-			g.rc_3.set_expo_LUT(throttle_expo_LUT);
-			g.rc_3.expo_enabled = true;
+			// uncomment to use Expo
+			//g.rc_3.set_expo_LUT(throttle_expo_LUT);
+			//g.rc_3.expo_enabled = true;
 		}
 
 		public function init_rc_out():void
